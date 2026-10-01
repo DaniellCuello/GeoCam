@@ -212,26 +212,55 @@ comprobó a mano sobre un teléfono físico con un development build.
 
 Todas las imágenes están en `assets/capturas/` y se tomaron en un iPhone con un development build.
 
+### Galería
+
 <table>
   <tr>
-    <td align="center" width="250"><img src="assets/capturas/01-inicio.png" width="250" alt="Pantalla de Inicio con el fondo topográfico"><br><sub><b>01</b> · Inicio: fondo negro con curvas de nivel, logotipo y tarjetas *Cámara* / *Mapa*</sub></td>
-    <td align="center"><img src="assets/capturas/02-camara-coordenadas.png" width="250" alt="Cámara con el chip de coordenadas"><br><sub><b>02</b> · Cámara con latitud/longitud en vivo</sub></td>
-    <td align="center"><img src="assets/capturas/03-mapa-marcadores.png" width="250" alt="Mapa con marcadores y Callout"><br><sub><b>03</b> · Mapa con los marcadores y el <i>Callout</i> de una foto</sub></td>
+    <td align="center" width="300">
+      <img src="assets/capturas/01-inicio.png" width="260" alt="Inicio de GeoCam" /><br>
+      <sub><b>01</b> · Inicio con fondo topográfico</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="assets/capturas/02-camara-coordenadas.png" width="260" alt="Cámara con coordenadas" /><br>
+      <sub><b>02</b> · Cámara con latitud/longitud en vivo</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="assets/capturas/03-mapa-marcadores.png" width="260" alt="Mapa con marcadores" /><br>
+      <sub><b>03</b> · Mapa con marcadores y Callout</sub>
+    </td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/capturas/04-mapa-sin-ubicacion.png" width="250" alt="Hoja de fotos sin ubicación"><br><sub><b>04</b> · Hoja inferior de fotos <b>sin coordenadas</b></sub></td>
-    <td align="center"><img src="assets/capturas/05-mapa-vacio.png" width="250" alt="Estado vacío del mapa"><br><sub><b>05</b> · Estado vacío con su acción *Abrir la cámara*</sub></td>
-    <td align="center"><img src="assets/capturas/06-ancho.png" width="250" alt="Inicio en horizontal"><br><sub><b>06</b> · Horizontal: las tarjetas pasan a dos columnas</sub></td>
+    <td align="center" width="300">
+      <img src="assets/capturas/04-mapa-sin-ubicacion.png" width="260" alt="Fotos sin ubicación" /><br>
+      <sub><b>04</b> · Fotos sin ubicación</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="assets/capturas/05-mapa-vacio.png" width="260" alt="Mapa vacío" /><br>
+      <sub><b>05</b> · Estado vacío del mapa</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="assets/capturas/06-ancho.png" width="260" alt="Versión horizontal" /><br>
+      <sub><b>06</b> · Vista horizontal</sub>
+    </td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/capturas/07-web.png" width="250" alt="Versión web"><br><sub><b>07</b> · Web: el mapa se sustituye por la lista de fotos</sub></td>
-    <td align="center"><img src="assets/capturas/08-icono.png" width="250" alt="Icono de la app"><br><sub><b>08</b> · El icono de GeoCam en el escritorio</sub></td>
-    <td align="center"></td>
+    <td align="center" width="300">
+      <img src="assets/capturas/07-web.png" width="260" alt="Versión web" /><br>
+      <sub><b>07</b> · Versión web</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="assets/capturas/08-icono.png" width="260" alt="Icono del app" /><br>
+      <sub><b>08</b> · Icono de la app</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="assets/capturas/p1-permiso-concedido.png" width="260" alt="Permiso concedido" /><br>
+      <sub><b>09</b> · Permiso concedido</sub>
+    </td>
   </tr>
 </table>
 
 <details>
-<summary>Cómo se consiguió cada estado</summary>
+<summary>Cómo se consiguieron</summary>
 
 | # | Archivo | Cómo llegar a ese estado |
 | --- | --- | --- |
@@ -243,6 +272,7 @@ Todas las imágenes están en `assets/capturas/` y se tomaron en un iPhone con u
 | 06 | `06-ancho.png` | Gira el móvil a horizontal (`orientation: "default"` lo permite). |
 | 07 | `07-web.png` | `npx expo start --web`. |
 | 08 | `08-icono.png` | Pantalla de inicio del sistema. |
+| 09 | `p1-permiso-concedido.png` | Permiso de cámara y ubicación concedido desde el sistema. |
 
 </details>
 
