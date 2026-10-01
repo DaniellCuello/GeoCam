@@ -210,37 +210,50 @@ comprobó a mano sobre un teléfono físico con un development build.
 
 ## Capturas de pantalla
 
-Todas las imágenes van en **`assets/capturas/`**, con los nombres exactos de la tabla. PNG a
-resolución nativa del dispositivo. Los archivos marcados como **obligatorias** son las evidencias de
-permisos del enunciable; el resto documenta el rediseño.
+Todas las imágenes están en `assets/capturas/` y se tomaron en un iPhone con un development build.
 
-| # | Archivo | Qué se ve | Cómo llegar a ese estado |
-| --- | --- | --- | --- |
-| 01 | `01-inicio.png` | Pantalla de Inicio: el fondo negro con curvas de nivel, el logotipo, la frase y las tarjetas *Cámara* / *Mapa*. | Abre la app con 2 o 3 fotos ya guardadas. |
-| 02 | `02-camara-coordenadas.png` | Cámara con el chip de latitud/longitud en vivo. | Pestaña *Cámara* → *Permitir cámara* → *Aceptar* → *Permitir ubicación* → *Aceptar*. |
-| 03 | `03-mapa-marcadores.png` | `MapView` con un `Marker` por foto y un `Callout` abierto con su miniatura. | Toma 2-3 fotos, ve a *Mapa* y pulsa el pin de una de ellas. |
-| 04 | `04-mapa-sin-ubicacion.png` | Hoja inferior con la lista de fotos **sin coordenadas**. | Niega la ubicación y toma una foto con la cámara. |
-| 05 | `05-mapa-vacio.png` | Estado vacío con icono, texto y el botón *Abrir la cámara*. | *Mapa* → *Vaciar* → confirma. |
-| 06 | `06-ancho.png` | La misma pantalla en tablet o en horizontal, con las tarjetas en dos columnas. | Gira el móvil o usa una tablet. |
-| 07 | `07-web.png` | Navegador con Inicio o Mapa; en web el mapa se sustituye por la lista de fotos. | `npx expo start --web`. |
-| 08 | `08-icono.png` | El icono de GeoCam en el escritorio o en el cajón de apps. | Pantalla de inicio del sistema. |
-| P1 | `p1-permiso-concedido.png` | **Obligatoria.** Cámara funcionando + chip de coordenadas. | Pestaña *Cámara* → *Permitir cámara* → *Aceptar*. |
-| P2 | `p2-permiso-rechazado.png` | **Obligatoria.** Título *Permiso rechazado* y botón *Volver a pedir*. | Deniega el diálogo la primera vez. |
-| P3 | `p3-permiso-bloqueado.png` | **Obligatoria.** Título *Permiso bloqueado* y botón *Abrir Ajustes*. | Ajustes → GeoCam → Cámara → *No*. |
+<table>
+  <tr>
+    <td align="center" width="250"><img src="assets/capturas/01-inicio.png" width="250" alt="Pantalla de Inicio con el fondo topográfico"><br><sub><b>01</b> · Inicio: fondo negro con curvas de nivel, logotipo y tarjetas *Cámara* / *Mapa*</sub></td>
+    <td align="center"><img src="assets/capturas/02-camara-coordenadas.png" width="250" alt="Cámara con el chip de coordenadas"><br><sub><b>02</b> · Cámara con latitud/longitud en vivo</sub></td>
+    <td align="center"><img src="assets/capturas/03-mapa-marcadores.png" width="250" alt="Mapa con marcadores y Callout"><br><sub><b>03</b> · Mapa con los marcadores y el <i>Callout</i> de una foto</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/capturas/04-mapa-sin-ubicacion.png" width="250" alt="Hoja de fotos sin ubicación"><br><sub><b>04</b> · Hoja inferior de fotos <b>sin coordenadas</b></sub></td>
+    <td align="center"><img src="assets/capturas/05-mapa-vacio.png" width="250" alt="Estado vacío del mapa"><br><sub><b>05</b> · Estado vacío con su acción *Abrir la cámara*</sub></td>
+    <td align="center"><img src="assets/capturas/06-ancho.png" width="250" alt="Inicio en horizontal"><br><sub><b>06</b> · Horizontal: las tarjetas pasan a dos columnas</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/capturas/07-web.png" width="250" alt="Versión web"><br><sub><b>07</b> · Web: el mapa se sustituye por la lista de fotos</sub></td>
+    <td align="center"><img src="assets/capturas/08-icono.png" width="250" alt="Icono de la app"><br><sub><b>08</b> · El icono de GeoCam en el escritorio</sub></td>
+    <td align="center"></td>
+  </tr>
+</table>
 
-Si prefieres GIF en lugar de PNG, el nombre es el mismo con extensión `.gif`. **Detalles que
-importan**: recorta la barra de notificaciones si contiene algo personal y difumina las coordenadas
-exactas si no quieres exponer tu ubicación real.
+<details>
+<summary>Cómo se consiguió cada estado</summary>
+
+| # | Archivo | Cómo llegar a ese estado |
+| --- | --- | --- |
+| 01 | `01-inicio.png` | Abre la app con 2 o 3 fotos ya guardadas. |
+| 02 | `02-camara-coordenadas.png` | Pestaña *Cámara* → *Permitir cámara* → *Aceptar* → *Permitir ubicación* → *Aceptar*. |
+| 03 | `03-mapa-marcadores.png` | Toma 2-3 fotos, ve a *Mapa* y pulsa el pin de una de ellas. |
+| 04 | `04-mapa-sin-ubicacion.png` | Niega la ubicación y toma una foto con la cámara. |
+| 05 | `05-mapa-vacio.png` | *Mapa* → *Vaciar* → confirma. |
+| 06 | `06-ancho.png` | Gira el móvil a horizontal (`orientation: "default"` lo permite). |
+| 07 | `07-web.png` | `npx expo start --web`. |
+| 08 | `08-icono.png` | Pantalla de inicio del sistema. |
+
+</details>
 
 ---
 
 ## Evidencias de permisos
 
-> **⚠️ PENDIENTE — estas tres evidencias aún no están en el repositorio.**
-> No se han inventado imágenes: requieren un teléfono físico con la app instalada. Deja la
-> aplicación de grabación en segundo plano y sustituye cada marcador por la captura o el GIF real.
-> Archivos: `assets/capturas/p1-permiso-concedido.png`, `assets/capturas/p2-permiso-rechazado.png` y
-> `assets/capturas/p3-permiso-bloqueado.png`.
+> **⚠️ Falta la mitad de las evidencias.** Está la captura del permiso **concedido**; las de
+> **rechazado** y **bloqueado** todavía no están en el repositorio. No se han inventado imágenes:
+> debajo queda la receta exacta para llegar a cada estado, y solo hay que guardarla como
+> `assets/capturas/p2-permiso-rechazado.png` y `assets/capturas/p3-permiso-bloqueado.png`.
 
 ### 1. Permiso concedido
 
@@ -251,7 +264,7 @@ parte superior.
 *Aceptar* en el diálogo del sistema. Acepta también la ubicación para que aparezcan las
 coordenadas.
 
-<!-- 📸 INSERTAR AQUÍ la captura o GIF del permiso CONCEDIDO (cámara visible + coordenadas) -->
+<img src="assets/capturas/p1-permiso-concedido.png" width="280" alt="Permiso concedido: cámara activa con coordenadas">
 
 ### 2. Permiso rechazado
 
@@ -265,7 +278,7 @@ banner *"Ubicación rechazada"* de la pantalla de cámara.
   Cámara → No permitir** y vuelve a la app. También sirve denegar el diálogo la primera vez
   (queda `canAskAgain === true` → estado `denied`).
 - *iOS*: rechaza desde el **diálogo** la primera vez. Tras un rechazo desde el diálogo iOS mantiene
-  `canAskAgain === true` (estado `denied`); cambiar la permissão en Ajustes es lo que produce el
+  `canAskAgain === true` (estado `denied`); cambiar la permiso en Ajustes es lo que produce el
   estado bloqueado del punto 3.
 
 <!-- 📸 INSERTAR AQUÍ la captura o GIF del permiso RECHAZADO -->
