@@ -251,11 +251,16 @@ photos
 
 ---
 
-### Video demostrativo del flujo CRUD y Persistencia
+### Demostración animada del flujo CRUD y Persistencia
 
-[![Ver Video Demostrativo](./assets/capturas/11-menu-busqueda-centrado.png)](./assets/capturas/demostracion-flujo.mp4)
+<div align="center">
+  <img src="./assets/capturas/demostracion-flujo.gif" width="340" alt="Demostración animada de GeoCam" /><br>
+  <sub><b>Demostración en vivo</b> · Persistencia SQLite, CRUD, Filtros y Modo Avión</sub>
+</div>
 
-🎬 **[Haz clic aquí para ver o descargar el Video Demostración (demostracion-flujo.mp4)](./assets/capturas/demostracion-flujo.mp4)**
+<br>
+
+🎬 **[Ver o descargar video original en MP4 con mayor definición (demostracion-flujo.mp4)](./assets/capturas/demostracion-flujo.mp4)**
 
 **Demostración del flujo:**
 1. Toma de fotografías geolocalizadas con la cámara.
