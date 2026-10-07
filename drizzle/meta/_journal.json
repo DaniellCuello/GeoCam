@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1791316076629,
+      "tag": "0000_photos-and-albums",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791316099904,
+      "tag": "0001_photo-notes-and-favorites",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791322314860,
+      "tag": "0002_chemical_cargill",
+      "breakpoints": true
+    }
+  ]
+}

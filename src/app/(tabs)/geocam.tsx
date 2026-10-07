@@ -21,10 +21,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, Layout, Radii, Spacing } from '@/constants/theme';
 import { Icons } from '@/constants/icons';
-import { useGeoPhotos } from '@/context/GeoPhotosContext';
 import { useCamera } from '@/hooks/useCamera';
 import { useGeoLocation } from '@/hooks/useGeoLocation';
+import { usePhotos } from '@/hooks/usePhotos';
 import { useShake } from '@/hooks/useShake';
+import { confirmAction } from '@/utils/confirm';
 import { toErrorMessage } from '@/utils/errors';
 import { formatAccuracy, formatCoords } from '@/utils/geo-format';
 import { canRequestPermission } from '@/utils/permissions';
@@ -42,7 +43,7 @@ export default function GeoCamScreen() {
   // la cámara y los sensores seguirían activos al cambiar de pestaña.
   const isFocused = useIsFocused();
 
-  const { photos, addPhoto } = useGeoPhotos();
+  const { photos, addPhoto, clearAll, queryError } = usePhotos();
   const {
     cameraRef,
     permission: cameraPermission,
@@ -74,9 +75,24 @@ export default function GeoCamScreen() {
     setStatusBarStyle(isFocused ? 'light' : 'dark');
   }, [isFocused]);
 
-  const handleShake = useCallback(() => {
-    Alert.alert('¡Sacudida detectada!', 'GeoCam capturó el sacudón del dispositivo.');
-  }, []);
+  const handleShake = useCallback(async () => {
+    const confirmed = await confirmAction({
+      title: 'Sacudida detectada',
+      message: '¿Quieres vaciar la colección de fotografías?',
+      confirmLabel: 'Vaciar',
+      destructive: true,
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await clearAll();
+    } catch (cause) {
+      Alert.alert('No se pudo vaciar', toErrorMessage(cause));
+    }
+  }, [clearAll]);
 
   const { error: shakeError } = useShake(handleShake, 13, 1200, isFocused);
 
@@ -94,7 +110,7 @@ export default function GeoCamScreen() {
     try {
       // `coords` viene del watch: se reutiliza en vez de pedir una posición
       // puntual, que en iOS falla cuando ya hay un watch activo.
-      await addPhoto('camera', uri, coords);
+      await addPhoto({ source: 'camera', uri, coords });
     } catch (cause) {
       Alert.alert('No se pudo guardar', toErrorMessage(cause));
     } finally {
@@ -116,7 +132,7 @@ export default function GeoCamScreen() {
         return;
       }
 
-      await addPhoto('gallery', asset.uri, coords);
+      await addPhoto({ source: 'gallery', uri: asset.uri, coords });
     } catch (cause) {
       Alert.alert('No se pudo abrir la galería', toErrorMessage(cause));
     }
@@ -263,7 +279,7 @@ export default function GeoCamScreen() {
             </Pressable>
           ) : null}
 
-          {cameraError || locationError || shakeError ? (
+          {cameraError || locationError || shakeError || queryError ? (
             <View style={styles.errorBanner} pointerEvents="none">
               {cameraError ? (
                 <ThemedText type="small" style={styles.errorText} numberOfLines={3}>
@@ -278,6 +294,11 @@ export default function GeoCamScreen() {
               {shakeError ? (
                 <ThemedText type="small" style={styles.errorText} numberOfLines={3}>
                   {shakeError}
+                </ThemedText>
+              ) : null}
+              {queryError ? (
+                <ThemedText type="small" style={styles.errorText} numberOfLines={3}>
+                  {queryError.message}
                 </ThemedText>
               ) : null}
             </View>

@@ -20,6 +20,7 @@ import { ThemedText } from './themed-text';
 const WEB_SECTIONS = [
   { name: 'inicio', href: '/', label: 'Inicio', icon: Icons.home },
   { name: 'camara', href: '/geocam', label: 'Cámara', icon: Icons.camera },
+  { name: 'biblioteca', href: '/biblioteca', label: 'Biblioteca', icon: Icons.library },
   { name: 'mapa', href: '/mapa', label: 'Mapa', icon: Icons.map },
 ] as const satisfies readonly { name: string; href: Href; label: string; icon: AppIcon }[];
 

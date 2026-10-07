@@ -1,7 +1,7 @@
 # GeoCam
 
 App móvil (Expo SDK 57 + Expo Router + TypeScript) para **capturar fotos geolocalizadas**,
-etiquetarlas con las coordenadas del dispositivo y verlas en un mapa.
+etiquetarlas con las coordenadas del dispositivo, organizarlas en la biblioteca y verlas en un mapa.
 
 ---
 
@@ -17,13 +17,12 @@ acelerómetro.
 
 | Pantalla | Ruta | Qué hace |
 | --- | --- | --- |
-| Inicio | `src/app/(tabs)/index.tsx` | Presentación de la app, contador de fotos en tiempo real y dos accesos: *Abrir cámara* y *Ver mapa*. No pide ningún permiso. |
+| Inicio | `src/app/(tabs)/index.tsx` | Presentación de la app, contador de fotos en tiempo real y accesos principales. No pide ningún permiso. |
 | GeoCam | `src/app/(tabs)/geocam.tsx` | Vista de cámara a pantalla completa, coordenadas en vivo, botón de galería, cambio de cámara frontal/trasera y detección de sacudidas. |
 | Mapa | `src/app/(tabs)/mapa.tsx` | `MapView` con un `Marker` por foto geolocalizada y `Callout` con miniatura. Lista aparte de las fotos **sin coordenadas**. |
 | Mapa (web) | `src/app/(tabs)/mapa.web.tsx` | Sustituye a `mapa.tsx` en web, donde `react-native-maps` no existe. Muestra todas las fotos en dos grupos (*En el mapa* / *Sin ubicación*) con sus coordenadas. |
 
-Las tres pestañas viven en el grupo `(tabs)`, y el estado de las fotos se comparte con
-`GeoPhotosProvider` montado en `src/app/(tabs)/_layout.tsx` (no en el layout raíz).
+Las cuatro pestañas viven en el grupo `(tabs)`.
 
 ### Sistema de diseño
 
@@ -38,7 +37,7 @@ espaciados ni radios sueltos.
 | `Spacing` · `Radii` · `Layout` | Escala de espaciado en múltiplos de 4, radios (`sm`…`pill`) y medidas de maquetación (`contentMaxWidth`, `gutter`, `minTouch`). |
 | `Night` | Superficies de la pantalla de Inicio, que es **siempre oscura**: `backdrop`, `fill`, `fillStrong`, `border`, `contour` y `contourAccent`. No dependen del tema del sistema. |
 
-Reglas que siguen las tres pantallas:
+Reglas que siguen las pantallas:
 
 - **Todo control táctil es un `Pressable`** (no `TouchableOpacity`) y recibe
   `accessibilityRole="button"`, una etiqueta y una altura mínima de `Layout.minTouch` (44 pt).
@@ -107,112 +106,11 @@ Reglas que se cumplen:
 - **"Abrir Ajustes"** llama a `Linking.openSettings()` y existe en ambos hooks, tanto para cámara
   como para ubicación, cuando el permiso queda bloqueado.
 
-### Sensores y limpieza al salir de la pantalla
-
-`NativeTabs` monta todas las pestañas de forma anticipada, así que `useIsFocused()` gobierna los
-recursos:
-
-- **GeoCam enfocada** → `CameraView` montado, `watchPositionAsync` activo si el permiso está
-  concedido, acelerómetro suscrito.
-- **Cambio de pestaña** → `CameraView` se desmonta, el `watchPositionAsync` se cancela con
-  `LocationSubscription.remove()` y el acelerómetro hace `Subscription.remove()`.
-- **Vuelta a GeoCam** → se reactivan los tres recursos con una sola instancia de cada uno; no se
-  acumulan listeners duplicados.
-
-`watchPositionAsync` es asíncrono, así que `useGeoLocation` protege la condición de carrera con un
-flag `active` local y `mountedRef`: si la suscripción se resuelve **después** del desmontaje, se
-llama a `subscription.remove()` igualmente en lugar de guardarla.
-
-### Errores como estado
-
-No hay ningún `console.log`. Los tres hooks exponen `error: string | null` y la pantalla los
-presenta en un banner: error de cámara, de ubicación y del sensor. `toErrorMessage(error: unknown)`
-normaliza cualquier excepción sin usar `any`.
-
-### Estructura
-
-```
-src/
-├── app/
-│   ├── _layout.tsx              # tema + splash; delega en <Slot />
-│   └── (tabs)/
-│       ├── _layout.tsx          # GeoPhotosProvider + AppTabs
-│       ├── index.tsx            # Inicio: hero, contador y accesos
-│       ├── geocam.tsx           # cámara + galería + acelerómetro
-│       ├── mapa.tsx             # mapa + lista sin ubicación
-│       └── mapa.web.tsx         # mismo estado, sin mapa (web)
-├── components/
-│   ├── app-tabs.tsx             # NativeTabs.Trigger (3 pestañas)
-│   ├── app-tabs.web.tsx         # cabecera de pestañas en el flujo, sin NativeTabs
-│   ├── GeoCamLogo.tsx           # logotipo de marca hecho con View
-│   ├── GeoPhotoCard.tsx         # tarjeta de foto
-│   ├── PermissionPrimer.tsx     # bloque de permiso reutilizable (5 estados)
-│   ├── SourceBadge.tsx          # distingue camera | gallery
-│   ├── EmptyState.tsx           # estado vacío con icono y acción
-│   ├── TopographicBackdrop.tsx  # curvas de nivel del fondo de Inicio (solo View)
-│   ├── splash-overlay.tsx       # portada de arranque (nativo) + .web.tsx
-│   ├── themed-text.tsx          # criterio tipográfico único
-│   └── themed-view.tsx          # contenedores con tipo de superficie
-├── constants/
-│   ├── icons.ts                 # nombres de icono por plataforma (expo-symbols)
-│   └── theme.ts                 # tokens: Colors, Surfaces, Night, Brand, Spacing, Radii, Layout
-├── context/GeoPhotosContext.tsx # photos, addPhoto, removePhoto, clearAll
-├── hooks/
-│   ├── useCamera.ts             # CameraView, facing, takePictureAsync, isCapturing
-│   ├── useGeoLocation.ts        # permiso, watchPositionAsync, refresh, cleanup
-│   ├── useShake.ts              # acelerómetro con umbral y cooldown
-│   └── use-theme.ts             # Colors + Surfaces del tema activo
-├── types/geo.ts                 # Coords, GeoPhoto, GeoSource, PermissionState
-└── utils/                       # confirm, errors, permissions, geo-format
-```
-
-### Configuración (`app.json`)
-
-| Plugin | Qué define |
-| --- | --- |
-| `expo-camera` | `cameraPermission` = *"GeoCam usa la cámara para tomar fotos geolocalizadas."* y `recordAudioAndroid: false`. |
-| `expo-location` | `locationWhenInUsePermission` = *"GeoCam usa tu ubicación para registrar dónde tomaste cada foto."* |
-| `expo-image-picker` | `photosPermission` para leer la galería, `microphonePermission: false`. |
-| `react-native-maps` | `androidGoogleMapsApiKey` (vacía hasta que la completes, ver abajo). |
-| `expo-sensors` | **No necesita entrada en `app.json`.** Expo lo aplica automáticamente: está en la lista `legacyExpoPlugins` de `@expo/prebuild-config`, y su plugin añade `NSMotionUsageDescription` en iOS. Verificado en la configuración nativa resuelta. |
-
-**Google Maps API key (solo Android).** El mapa usa Apple Maps en iOS (sin clave) y Google Maps en
-Android. Con la clave vacía el plugin elimina el `meta-data` del manifiesto: la app compila y todo
-lo demás funciona, pero Android dibuja el mapa en blanco. Para verlo, edita `app.json`:
-
-```jsonc
-[
-  "react-native-maps",
-  {
-    "androidGoogleMapsApiKey": "TU_CLAVE_DE_GOOGLE_MAPS"
-  }
-]
-```
-
-### Pruebas
-
-```bash
-npx tsc --noEmit        # typecheck
-npx expo lint           # eslint (eslint.config.js)
-npx expo-doctor         # 21/21 checks
-npx expo install --check
-```
-
-Resultados de la última auditoría: `tsc` limpio, `lint` limpio, `expo-doctor` 21/21,
-`expo install --check` sin desajustes, y los export de Metro para Android y web completados.
-
-**Verificado en código y compilación** con los cuatro comandos de arriba. La parte que no se puede
-automatizar en un entorno sin dispositivo —el preview de la cámara, la captura real, la lectura del
-GPS, los diálogos de permisos del sistema, el acelerómetro, los marcadores y el `Callout`— se
-comprobó a mano sobre un teléfono físico con un development build.
-
----
-
-## Capturas de pantalla
+### Capturas de pantalla de la Semana 6
 
 Todas las imágenes están en `assets/capturas/` y se tomaron en un iPhone con un development build.
 
-### Galería
+#### Galería Semana 6
 
 <table>
   <tr>
@@ -259,75 +157,97 @@ Todas las imágenes están en `assets/capturas/` y se tomaron en un iPhone con u
   </tr>
 </table>
 
-<details>
-<summary>Cómo se consiguieron</summary>
+### Evidencias de permisos (Semana 6)
 
-| # | Archivo | Cómo llegar a ese estado |
-| --- | --- | --- |
-| 01 | `01-inicio.png` | Abre la app con 2 o 3 fotos ya guardadas. |
-| 02 | `02-camara-coordenadas.png` | Pestaña *Cámara* → *Permitir cámara* → *Aceptar* → *Permitir ubicación* → *Aceptar*. |
-| 03 | `03-mapa-marcadores.png` | Toma 2-3 fotos, ve a *Mapa* y pulsa el pin de una de ellas. |
-| 04 | `04-mapa-sin-ubicacion.png` | Niega la ubicación y toma una foto con la cámara. |
-| 05 | `05-mapa-vacio.png` | *Mapa* → *Vaciar* → confirma. |
-| 06 | `06-ancho.png` | Gira el móvil a horizontal (`orientation: "default"` lo permite). |
-| 07 | `07-web.png` | `npx expo start --web`. |
-| 08 | `08-icono.png` | Pantalla de inicio del sistema. |
-| 09 | `p1-permiso-concedido.png` | Permiso de cámara y ubicación concedido desde el sistema. |
+#### 1. Permiso concedido
 
-</details>
+**Qué debe verse:** La vista de cámara funcionando a pantalla completa con el chip de coordenadas en tiempo real (`latitud`/`longitud`) en la parte superior.
+
+<div align="center">
+  <img src="assets/capturas/p1-permiso-concedido.png" width="280" alt="Permiso concedido: cámara activa con coordenadas" />
+</div>
+
 
 ---
 
-## Evidencias de permisos
+## Semana 7 — GeoCam persistente
 
-> **⚠️ Falta la mitad de las evidencias.** Está la captura del permiso **concedido**; las de
-> **rechazado** y **bloqueado** todavía no están en el repositorio. No se han inventado imágenes:
-> debajo queda la receta exacta para llegar a cada estado, y solo hay que guardarla como
-> `assets/capturas/p2-permiso-rechazado.png` y `assets/capturas/p3-permiso-bloqueado.png`.
+### Objetivo
 
-### 1. Permiso concedido
+Reemplazar el contexto en memoria de la Semana 6 por **SQLite con Drizzle ORM**, de modo que las fotografías, sus coordenadas, álbumes y notas sobrevivan al cierre de la app y funcionen sin conexión (modo avión).
 
-**Qué debe verse:** la cámara funcionando y el chip de coordenadas con latitud/longitud reales en la
-parte superior.
+### Modelo de datos
 
-**Cómo llegar a este estado:** instala la app, abre la pestaña *GeoCam* y pulsa *Permitir cámara* →
-*Aceptar* en el diálogo del sistema. Acepta también la ubicación para que aparezcan las
-coordenadas.
+```text
+albums
+  id PK · name UNIQUE · created_at
+       1
+       │ album_id (nullable, ON DELETE SET NULL)
+       *
+photos
+  id PK · uri · latitude? · longitude? · accuracy? · source · created_at
+  note? · favorite (boolean, default false)
+  (índice: photos_created_at_idx en created_at)
+```
 
-<img src="assets/capturas/p1-permiso-concedido.png" width="280" alt="Permiso concedido: cámara activa con coordenadas">
+### Novedades y Funcionalidades de la Semana 7
 
-### 2. Permiso rechazado
+1. **Base de Datos Persistente con Expo SQLite y Drizzle ORM**:
+   - `db/client.ts`: Configurado con `openDatabaseSync('geocam.db', { enableChangeListener: true })` y `PRAGMA foreign_keys = ON;`.
+   - Layout raíz (`src/app/_layout.tsx`) protegido con `useMigrations`.
 
-**Qué debe verse:** el bloque con el título **"Permiso rechazado"**, el texto de justificación y el
-botón **"Volver a pedir"** (no debe decir "Abrir Ajustes"). Opcionalmente, captura adicional del
-banner *"Ubicación rechazada"* de la pantalla de cámara.
+2. **Tres Migraciones SQL Versionadas (`drizzle/`)**:
+   - `0000_photos-and-albums.sql`: Tablas `photos`, `albums` y relación `album_id` con `ON DELETE SET NULL`.
+   - `0001_photo-notes-and-favorites.sql`: Columnas `note` (texto opcional) y `favorite` (booleano default false).
+   - `0002_chemical_cargill.sql`: Índice `photos_created_at_idx` sobre `created_at` (Reto opcional).
 
-**Cómo llegar a este estado:**
+3. **Pestaña Biblioteca (`src/app/(tabs)/biblioteca.tsx`)**:
+   - Nueva pestaña en la navegación para explorar toda la colección con contador y renderizado optimizado.
 
-- *Android*: con el permiso ya concedido, ve a **Ajustes → Aplicaciones → GeoCam → Permisos →
-  Cámara → No permitir** y vuelve a la app. También sirve denegar el diálogo la primera vez
-  (queda `canAskAgain === true` → estado `denied`).
-- *iOS*: rechaza desde el **diálogo** la primera vez. Tras un rechazo desde el diálogo iOS mantiene
-  `canAskAgain === true` (estado `denied`); cambiar la permiso en Ajustes es lo que produce el
-  estado bloqueado del punto 3.
+4. **Buscador Centrado y Burbuja Flotante (`src/components/PhotoFilters.tsx`)**:
+   - Burbuja flotante compacta con icono de lupita sobre el mapa.
+   - Al presionar la burbuja se abre un **Modal centrado** con la búsqueda por nota, filtro por álbumes, favoritas y creación de álbumes.
 
-<!-- 📸 INSERTAR AQUÍ la captura o GIF del permiso RECHAZADO -->
+5. **CRUD Completo de Fotografías (`src/app/foto/[id].tsx`)**:
+   - Pantalla de detalle para visualizar la foto, editar su nota, marcarla como favorita, moverla de álbum y eliminarla con confirmación.
 
-### 3. Permiso bloqueado
+6. **Archivos Permanentes (`src/services/photoFiles.ts`)**:
+   - Copia imágenes desde la caché a `Paths.document/photos/` usando las clases modernas `File`, `Directory` y `Paths` de `expo-file-system`.
+   - Borra el archivo físico del disco cuando se elimina el registro en SQLite.
 
-**Qué debe verse:** el bloque con el título **"Permiso bloqueado"**, la pista *"Actívalo en Ajustes →
-permisos de la aplicación"* y el botón **"Abrir Ajustes"**. Si quieres, añade un GIF corto del
-mismo botón abriendo Ajustes del sistema.
+7. **Reto Opcional (Rendimiento)**:
+   - Script de benchmark en `src/utils/benchmark.ts` para sembrar e insertar 1.000 fotos de prueba y medir con `console.time` el listado optimizado por el índice `photos_created_at_idx`.
 
-**Cómo llegar a este estado:**
+---
 
-- *Android*: en el diálogo de permiso elige **"No volver a preguntar"** (o
-  Ajustes → Aplicaciones → GeoCam → Permisos → Cámara → **Negar** dos veces hasta que se guarde
-  como bloqueado). Requiere `canAskAgain === false`.
-- *iOS*: **Ajustes → GeoCam → Cámara → "No"**. Al cambiarlo desde Ajustes, iOS deja de permitir
-  volver a preguntar y el estado pasa a `blocked`.
+### Capturas de pantalla de la Semana 7
 
-<!-- 📸 INSERTAR AQUÍ la captura o GIF del permiso BLOQUEADO -->
+Guarda las capturas de la Semana 7 en `assets/capturas/`:
+
+| Archivo | Pantalla a capturar | Qué debe verse |
+| --- | --- | --- |
+| `09-biblioteca.png` | **Pestaña Biblioteca** (`/biblioteca`) | Listado completo de fotografías guardadas, contador en la cabecera y barra de filtros. |
+| `10-detalle-foto.png` | **Detalle de Foto** (`/foto/[id]`) | Fotografía a pantalla completa, nota editada, botón de favorita activado (`★ Favorita`) y selector de álbum. |
+| `11-menu-busqueda-centrado.png` | **Menú de búsqueda centrado** | Diálogo modal centrado abierto al presionar la burbuja flotante con la lupita en el Mapa o Biblioteca. |
+| `12-filtro-favoritas-albumes.png` | **Filtros activos** | Vista filtrada mostrando solo fotos favoritas o pertenecientes a un álbum específico, con la burbuja indicando el estado activo. |
+| `13-crear-album.png` | **Creación de álbum** | Formulario para crear un nuevo álbum desde el menú de filtros y actualización en tiempo real de los chips. |
+
+---
+
+### Video demostrativo del flujo (.mp4)
+
+Guarda la grabación de pantalla como **`assets/capturas/demostracion-flujo.mp4`** (o `.gif`).
+
+**Qué debe mostrar el video:**
+1. Toma de 3 fotografías geolocalizadas con la cámara.
+2. Edición de notas, marcado como favorita y asignación a un álbum en la pantalla de detalle.
+3. Apertura del menú centrado desde la burbuja flotante de la lupita y filtrado por nota.
+4. Cierre completo de Expo Go / App y reapertura comprobando que las fotos y sus coordenadas persisten.
+5. Verificación en modo avión.
+
+```html
+<video src="assets/capturas/demostracion-flujo.mp4" controls width="100%"></video>
+```
 
 ---
 
@@ -336,27 +256,21 @@ mismo botón abriendo Ajustes del sistema.
 ```bash
 npm install
 npx expo start
+npx drizzle-kit generate
+npx expo start -c
 ```
 
 | Escenario | ¿Funciona? | Comando |
 | --- | --- | --- |
-| **Expo Go** | **No.** `expo-camera`, `expo-location`, `expo-sensors` y `react-native-maps` son módulos nativos y Expo Go solo carga los suyos. | — |
-| **Development build (para probar cámara, GPS, shake y mapa)** | Sí. Es lo que necesitas para las evidencias de permisos. | `npx expo run:android` · `npx expo run:ios` · o `eas build --profile development` |
-| **Producción** | Sí, con la `androidGoogleMapsApiKey` puesta si publicas en Android. | `eas build --profile production` |
-| **Web** | Parcial: navegan Inicio, Mapa y la lista de fotos, pero no hay lienzo de mapa ni cámara. | `npx expo start --web` |
+| **Expo Go** | **No.** `expo-camera`, `expo-location`, `expo-sensors`, `expo-sqlite` y `react-native-maps` requieren un development build. | — |
+| **Development build** | Sí. Para probar cámara, GPS, shake, mapa y SQLite. | `npx expo run:android` · `npx expo run:ios` · o `eas build --profile development` |
+| **Producción** | Sí, declarando `androidGoogleMapsApiKey` si publicas en Android. | `eas build --profile production` |
+| **Web** | Parcial: navegan Inicio, Biblioteca, Mapa y Detalle, almacenando imágenes como data URI en SQLite del navegador. | `npx expo start --web` |
 
 ---
 
 ## Límites conocidos
 
-- El mapa no se renderiza en **web**: `react-native-maps` llega hasta
-  `codegenNativeComponent`, que `react-native-web` no exporta. Por eso la versión web de la
-  pantalla es un archivo aparte (`mapa.web.tsx`) y no una rama `Platform.OS` dentro de
-  `mapa.tsx` — con un `if` el módulo seguiría entrando en el bundle y rompería. En su lugar se
-  listan todas las fotos con sus coordenadas.
-- Las fotos de la galería se etiquetan con la ubicación **actual**, porque `expo-image-picker` no
-  expone los EXIF de la imagen.
-- El estado de las fotos vive en memoria: se pierde al recargar la app. No hay persistencia
-  (SQLite) ni se guardan archivos en el disco.
-- `npm audit` reporta 14 vulnerabilidades moderadas en dependencias transitivas del template; no se
-  ejecutó `npm audit fix` para no tocar versiones de Expo sin autorización.
+- El mapa no se renderiza en **web**: `react-native-maps` llega hasta `codegenNativeComponent`, que `react-native-web` no exporta. Por eso la versión web es un archivo aparte (`mapa.web.tsx`).
+- Las fotos de la galería se etiquetan con la ubicación **actual**, porque `expo-image-picker` no expone los EXIF de la imagen.
+- La base de datos y las fotos son locales al dispositivo; desinstalar la app o cambiar de teléfono no sincroniza fotos a la nube.

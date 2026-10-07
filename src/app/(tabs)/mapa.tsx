@@ -1,22 +1,25 @@
 import { Image } from 'expo-image';
 import { router, useIsFocused } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import MapView, { Callout, Marker, type Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
 import { GeoPhotoCard } from '@/components/GeoPhotoCard';
+import { PhotoFilters } from '@/components/PhotoFilters';
 import { SourceBadge } from '@/components/SourceBadge';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, Layout, Radii, Spacing } from '@/constants/theme';
 import { Icons } from '@/constants/icons';
-import { useGeoPhotos } from '@/context/GeoPhotosContext';
+import { useAlbums } from '@/hooks/useAlbums';
 import { useGeoLocation } from '@/hooks/useGeoLocation';
+import { usePhotos } from '@/hooks/usePhotos';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmAction } from '@/utils/confirm';
-import { formatCoords, formatTimestamp } from '@/utils/geo-format';
+import { toErrorMessage } from '@/utils/errors';
+import { formatCoords, formatTimestamp, photoCoords } from '@/utils/geo-format';
 import type { Coords } from '@/types/geo';
 
 /**
@@ -56,34 +59,59 @@ export default function MapaScreen() {
   const { width, height } = useWindowDimensions();
   const isFocused = useIsFocused();
   const theme = useTheme();
-  const { photos, removePhoto, clearAll } = useGeoPhotos();
+  const [search, setSearch] = useState('');
+  const [albumId, setAlbumId] = useState<number | null | 'all'>('all');
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
+  const { photos, photosWithLocation, removePhoto, clearAll, queryError } = usePhotos({
+    search,
+    albumId,
+    onlyFavorites,
+  });
+  const { albums, error: albumsError, createAlbum, removeAlbum } = useAlbums();
   // El mapa solo necesita la posición mientras la pestaña está enfocada.
   const { permission: locationPermission, coords: currentCoords } = useGeoLocation({
     watch: isFocused,
   });
 
-  const { locatedPhotos, unlocatedPhotos } = useMemo(
+  const { unlocatedPhotos } = useMemo(
     () => ({
-      locatedPhotos: photos.filter((photo) => photo.coords !== null),
-      unlocatedPhotos: photos.filter((photo) => photo.coords === null),
+      unlocatedPhotos: photos.filter((photo) => photo.latitude === null),
     }),
     [photos]
   );
 
+  const photoCount = photos.length;
   const region = useMemo(() => toRegion(currentCoords), [currentCoords]);
 
   const handleClearAll = useCallback(async () => {
     const confirmed = await confirmAction({
       title: 'Vaciar colección',
-      message: `Se eliminarán las ${photos.length} fotos.`,
+      message: `Se eliminarán las ${photoCount} fotos.`,
       confirmLabel: 'Vaciar',
       destructive: true,
     });
 
     if (confirmed) {
-      clearAll();
+      try {
+        await clearAll();
+        setClearError(null);
+      } catch (cause) {
+        setClearError(toErrorMessage(cause, 'No se pudieron borrar las fotografías.'));
+      }
     }
-  }, [photos.length, clearAll]);
+  }, [photoCount, clearAll]);
+
+  const handleRemovePhoto = useCallback(
+    async (id: number) => {
+      try {
+        await removePhoto(id);
+      } catch (cause) {
+        setClearError(toErrorMessage(cause, 'No se pudo eliminar la fotografía.'));
+      }
+    },
+    [removePhoto]
+  );
 
   // El `Callout` se dimensiona con la pantalla: en un iPhone pequeño no debe
   // comerse el mapa y en una tablet tampoco debe quedarse diminuto.
@@ -93,8 +121,8 @@ export default function MapaScreen() {
   const counterLabel =
     photos.length === 0
       ? 'Sin fotografías todavía'
-      : `${photos.length} ${photos.length === 1 ? 'foto' : 'fotos'} · ${
-          locatedPhotos.length
+      : `${photoCount} ${photoCount === 1 ? 'foto' : 'fotos'} · ${
+          photosWithLocation.length
         } en el mapa`;
 
   return (
@@ -104,14 +132,22 @@ export default function MapaScreen() {
         initialRegion={region}
         showsUserLocation={locationPermission === 'granted'}
         showsMyLocationButton={false}>
-        {locatedPhotos.map((photo) =>
-          photo.coords ? (
+        {photosWithLocation.map((photo) => {
+          const coords = photoCoords(photo);
+          return coords ? (
             <Marker
               key={photo.id}
-              coordinate={photo.coords}
-              title={`${formatCoords(photo.coords)} · ${formatTimestamp(photo.createdAt)}`}
+              coordinate={coords}
+              title={`${formatCoords(coords)} · ${formatTimestamp(photo.createdAt)}`}
               description={photo.source === 'camera' ? 'Tomada con la cámara' : 'Desde la galería'}>
-              <Callout tooltip>
+              <Callout
+                tooltip
+                onPress={() =>
+                  router.push({
+                    pathname: '/foto/[id]',
+                    params: { id: String(photo.id) },
+                  })
+                }>
                 <View style={[styles.callout, { width: calloutWidth }]}>
                   <Image
                     source={{ uri: photo.uri }}
@@ -120,7 +156,7 @@ export default function MapaScreen() {
                   />
                   <SourceBadge source={photo.source} />
                   <ThemedText type="code" numberOfLines={1}>
-                    {formatCoords(photo.coords)}
+                    {formatCoords(coords)}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
                     {formatTimestamp(photo.createdAt)}
@@ -128,8 +164,8 @@ export default function MapaScreen() {
                 </View>
               </Callout>
             </Marker>
-          ) : null
-        )}
+          ) : null;
+        })}
       </MapView>
 
       {/* Encabezado: arranca debajo del notch, la Dynamic Island o la barra de
@@ -174,6 +210,34 @@ export default function MapaScreen() {
         </View>
       </View>
 
+      <View
+        style={[
+          styles.filters,
+          {
+            top: insets.top + 56,
+          },
+        ]}>
+        <PhotoFilters
+          search={search}
+          onSearchChange={setSearch}
+          albumId={albumId}
+          onAlbumChange={setAlbumId}
+          onlyFavorites={onlyFavorites}
+          onFavoritesChange={setOnlyFavorites}
+          albums={albums}
+          createAlbum={createAlbum}
+          removeAlbum={removeAlbum}
+        />
+      </View>
+
+      {queryError || albumsError || clearError ? (
+        <View style={[styles.errorNotice, { top: insets.top + 112 }]}>
+          <ThemedText type="smallBold" style={styles.errorText}>
+            {queryError?.message ?? albumsError?.message ?? clearError}
+          </ThemedText>
+        </View>
+      ) : null}
+
       {photos.length === 0 ? (
         <View style={styles.emptyWrap} pointerEvents="box-none">
           <EmptyState
@@ -210,7 +274,7 @@ export default function MapaScreen() {
             contentContainerStyle={styles.sheetContent}
             showsVerticalScrollIndicator={false}>
             {unlocatedPhotos.map((photo) => (
-              <GeoPhotoCard key={photo.id} photo={photo} onRemove={removePhoto} />
+              <GeoPhotoCard key={photo.id} photo={photo} onRemove={handleRemovePhoto} />
             ))}
           </ScrollView>
         </View>
@@ -240,6 +304,22 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: Layout.gutter,
+  },
+  filters: {
+    position: 'absolute',
+    alignSelf: 'center',
+    width: '100%',
+  },
+  errorNotice: {
+    position: 'absolute',
+    left: Layout.gutter,
+    right: Layout.gutter,
+    padding: Spacing.two,
+    borderRadius: Radii.md,
+    backgroundColor: Brand.dangerSoft,
+  },
+  errorText: {
+    color: Brand.danger,
   },
   headerRow: {
     flexDirection: 'row',

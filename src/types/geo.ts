@@ -11,14 +11,6 @@ export type Coords = {
   accuracy: number | null;
 };
 
-export type GeoPhoto = {
-  id: string;
-  uri: string;
-  createdAt: number;
-  source: GeoSource;
-  coords: Coords | null;
-};
-
 /**
  * Estados de permiso que maneja la app.
  *

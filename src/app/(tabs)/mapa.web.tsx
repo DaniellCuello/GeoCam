@@ -1,18 +1,21 @@
 import { router, useIsFocused } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { EmptyState } from '@/components/EmptyState';
 import { GeoPhotoCard } from '@/components/GeoPhotoCard';
+import { PhotoFilters } from '@/components/PhotoFilters';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, Layout, Radii, Spacing } from '@/constants/theme';
 import { Icons } from '@/constants/icons';
-import { useGeoPhotos } from '@/context/GeoPhotosContext';
+import { useAlbums } from '@/hooks/useAlbums';
 import { useGeoLocation } from '@/hooks/useGeoLocation';
+import { usePhotos } from '@/hooks/usePhotos';
 import { useTheme } from '@/hooks/use-theme';
 import { confirmAction } from '@/utils/confirm';
+import { toErrorMessage } from '@/utils/errors';
 import { formatCoords } from '@/utils/geo-format';
 
 /**
@@ -34,16 +37,25 @@ export default function MapaWebScreen() {
   const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
   const theme = useTheme();
-  const { photos, removePhoto, clearAll } = useGeoPhotos();
+  const [search, setSearch] = useState('');
+  const [albumId, setAlbumId] = useState<number | null | 'all'>('all');
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
+  const { photos, photosWithLocation, removePhoto, clearAll, queryError } = usePhotos({
+    search,
+    albumId,
+    onlyFavorites,
+  });
+  const { albums, error: albumsError, createAlbum, removeAlbum } = useAlbums();
   // La posición se sigue pidiendo en web para mantener el mismo ciclo de vida.
   const { coords: currentCoords } = useGeoLocation({ watch: isFocused });
 
   const { locatedPhotos, unlocatedPhotos } = useMemo(
     () => ({
-      locatedPhotos: photos.filter((photo) => photo.coords !== null),
-      unlocatedPhotos: photos.filter((photo) => photo.coords === null),
+      locatedPhotos: photosWithLocation,
+      unlocatedPhotos: photos.filter((photo) => photo.latitude === null),
     }),
-    [photos]
+    [photos, photosWithLocation]
   );
 
   const handleClearAll = useCallback(async () => {
@@ -55,9 +67,26 @@ export default function MapaWebScreen() {
     });
 
     if (confirmed) {
-      clearAll();
+      try {
+        await clearAll();
+        setClearError(null);
+      } catch (cause) {
+        setClearError(toErrorMessage(cause, 'No se pudieron borrar las fotografías.'));
+      }
     }
   }, [photos.length, clearAll]);
+
+  const handleRemovePhoto = useCallback(
+    async (id: number) => {
+      try {
+        await removePhoto(id);
+        setClearError(null);
+      } catch (cause) {
+        setClearError(toErrorMessage(cause, 'No se pudo eliminar la fotografía.'));
+      }
+    },
+    [removePhoto]
+  );
 
   const isWide = width >= 880;
 
@@ -70,6 +99,24 @@ export default function MapaWebScreen() {
         ]}
         showsVerticalScrollIndicator={false}>
         <View style={styles.column}>
+          <PhotoFilters
+            search={search}
+            onSearchChange={setSearch}
+            albumId={albumId}
+            onAlbumChange={setAlbumId}
+            onlyFavorites={onlyFavorites}
+            onFavoritesChange={setOnlyFavorites}
+            albums={albums}
+            createAlbum={createAlbum}
+            removeAlbum={removeAlbum}
+          />
+
+          {queryError || albumsError || clearError ? (
+            <ThemedText type="small" style={styles.error}>
+              {queryError?.message ?? albumsError?.message ?? clearError}
+            </ThemedText>
+          ) : null}
+
           <ThemedView
             type="backgroundElement"
             style={[styles.notice, { borderColor: theme.border, boxShadow: theme.shadow }]}>
@@ -133,7 +180,7 @@ export default function MapaWebScreen() {
                       <GeoPhotoCard
                         key={photo.id}
                         photo={photo}
-                        onRemove={removePhoto}
+                        onRemove={handleRemovePhoto}
                         style={isWide ? styles.cardWide : undefined}
                       />
                     ))}
@@ -151,7 +198,7 @@ export default function MapaWebScreen() {
                       <GeoPhotoCard
                         key={photo.id}
                         photo={photo}
-                        onRemove={removePhoto}
+                        onRemove={handleRemovePhoto}
                         style={isWide ? styles.cardWide : undefined}
                       />
                     ))}
@@ -235,5 +282,8 @@ const styles = StyleSheet.create({
   cardWide: {
     flexGrow: 1,
     flexBasis: 300,
+  },
+  error: {
+    color: Brand.danger,
   },
 });

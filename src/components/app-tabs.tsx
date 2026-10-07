@@ -28,6 +28,11 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon sf="camera.fill" md="photo_camera" />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="biblioteca">
+        <NativeTabs.Trigger.Label>Biblioteca</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="photo.stack.fill" md="collections" />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="mapa">
         <NativeTabs.Trigger.Label>Mapa</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="map.fill" md="map" />

@@ -2,6 +2,9 @@
 
 # dependencies
 node_modules/
+*.db
+*.db-shm
+*.db-wal
 
 # Expo
 .expo/
@@ -41,3 +44,7 @@ example
 # generated native folders
 /ios
 /android
+
+# scratch temporary files
+scratch/
+

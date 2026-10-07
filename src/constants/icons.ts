@@ -18,6 +18,7 @@ export const Icons = {
   home: { ios: 'house.fill', android: 'home', web: 'home' },
   camera: { ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' },
   map: { ios: 'map.fill', android: 'map', web: 'map' },
+  library: { ios: 'photo.stack.fill', android: 'collections', web: 'collections' },
 
   /** Cámara. */
   flipCamera: {
@@ -29,7 +30,9 @@ export const Icons = {
   photo: { ios: 'photo', android: 'image', web: 'image' },
   location: { ios: 'location.fill', android: 'my_location', web: 'my_location' },
 
-  /** Mapa. */
+  /** Mapa y Filtros. */
   trash: { ios: 'trash', android: 'delete', web: 'delete' },
   chevron: { ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' },
+  search: { ios: 'magnifyingglass', android: 'search', web: 'search' },
+  close: { ios: 'xmark', android: 'close', web: 'close' },
 } as const satisfies Record<string, AppIcon>;

@@ -1,6 +1,5 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { TopographicBackdrop } from '@/components/TopographicBackdrop';
 import { Brand, Layout, Night, Radii, Spacing } from '@/constants/theme';
 import { Icons, type AppIcon } from '@/constants/icons';
-import { useGeoPhotos } from '@/context/GeoPhotosContext';
+import { usePhotos } from '@/hooks/usePhotos';
 
 type ActionCardProps = {
   icon: AppIcon;
@@ -70,13 +69,10 @@ function ActionCard({ icon, tone, title, description, onPress, style }: ActionCa
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { photos } = useGeoPhotos();
+  const { photos, photosWithLocation, queryError } = usePhotos();
 
   const isWide = width >= 880;
-  const locatedCount = useMemo(
-    () => photos.filter((photo) => photo.coords !== null).length,
-    [photos]
-  );
+  const locatedCount = photosWithLocation.length;
 
   return (
     <View style={[styles.root, { backgroundColor: Night.backdrop }]}>
@@ -102,6 +98,12 @@ export default function HomeScreen() {
               Fotos que llevan contigo el lugar donde ocurrieron.
             </ThemedText>
           </Animated.View>
+
+          {queryError ? (
+            <ThemedText type="small" tone="onDark">
+              No se pudieron cargar las fotografías: {queryError.message}
+            </ThemedText>
+          ) : null}
 
           {photos.length > 0 ? (
             <View style={[styles.stats, { backgroundColor: Night.fill, borderColor: Night.border }]}>
@@ -132,6 +134,14 @@ export default function HomeScreen() {
               title="Cámara"
               description="Toma fotografías y asócialas con tu ubicación."
               onPress={() => router.push('/geocam')}
+              style={isWide ? styles.actionWide : undefined}
+            />
+            <ActionCard
+              icon={Icons.library}
+              tone={Brand.primaryLight}
+              title="Biblioteca"
+              description="Revisa, busca y organiza todas tus fotos guardadas."
+              onPress={() => router.push('/biblioteca')}
               style={isWide ? styles.actionWide : undefined}
             />
             <ActionCard
