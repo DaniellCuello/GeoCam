@@ -115,43 +115,43 @@ Todas las imágenes están en `assets/capturas/` y se tomaron en un iPhone con u
 <table>
   <tr>
     <td align="center" width="300">
-      <img src="assets/capturas/01-inicio.png" width="260" alt="Inicio de GeoCam" /><br>
+      <img src="./assets/capturas/01-inicio.png" width="260" alt="Inicio de GeoCam" /><br>
       <sub><b>01</b> · Inicio con fondo topográfico</sub>
     </td>
     <td align="center" width="300">
-      <img src="assets/capturas/02-camara-coordenadas.png" width="260" alt="Cámara con coordenadas" /><br>
+      <img src="./assets/capturas/02-camara-coordenadas.png" width="260" alt="Cámara con coordenadas" /><br>
       <sub><b>02</b> · Cámara con latitud/longitud en vivo</sub>
     </td>
     <td align="center" width="300">
-      <img src="assets/capturas/03-mapa-marcadores.png" width="260" alt="Mapa con marcadores" /><br>
+      <img src="./assets/capturas/03-mapa-marcadores.png" width="260" alt="Mapa con marcadores" /><br>
       <sub><b>03</b> · Mapa con marcadores y Callout</sub>
     </td>
   </tr>
   <tr>
     <td align="center" width="300">
-      <img src="assets/capturas/04-mapa-sin-ubicacion.png" width="260" alt="Fotos sin ubicación" /><br>
+      <img src="./assets/capturas/04-mapa-sin-ubicacion.png" width="260" alt="Fotos sin ubicación" /><br>
       <sub><b>04</b> · Fotos sin ubicación</sub>
     </td>
     <td align="center" width="300">
-      <img src="assets/capturas/05-mapa-vacio.png" width="260" alt="Mapa vacío" /><br>
+      <img src="./assets/capturas/05-mapa-vacio.png" width="260" alt="Mapa vacío" /><br>
       <sub><b>05</b> · Estado vacío del mapa</sub>
     </td>
     <td align="center" width="300">
-      <img src="assets/capturas/06-ancho.png" width="260" alt="Versión horizontal" /><br>
+      <img src="./assets/capturas/06-ancho.png" width="260" alt="Versión horizontal" /><br>
       <sub><b>06</b> · Vista horizontal</sub>
     </td>
   </tr>
   <tr>
     <td align="center" width="300">
-      <img src="assets/capturas/07-web.png" width="260" alt="Versión web" /><br>
+      <img src="./assets/capturas/07-web.png" width="260" alt="Versión web" /><br>
       <sub><b>07</b> · Versión web</sub>
     </td>
     <td align="center" width="300">
-      <img src="assets/capturas/08-icono.png" width="260" alt="Icono del app" /><br>
+      <img src="./assets/capturas/08-icono.png" width="260" alt="Icono del app" /><br>
       <sub><b>08</b> · Icono de la app</sub>
     </td>
     <td align="center" width="300">
-      <img src="assets/capturas/p1-permiso-concedido.png" width="260" alt="Permiso concedido" /><br>
+      <img src="./assets/capturas/p1-permiso-concedido.png" width="260" alt="Permiso concedido" /><br>
       <sub><b>09</b> · Permiso concedido</sub>
     </td>
   </tr>
@@ -164,7 +164,7 @@ Todas las imágenes están en `assets/capturas/` y se tomaron en un iPhone con u
 **Qué debe verse:** La vista de cámara funcionando a pantalla completa con el chip de coordenadas en tiempo real (`latitud`/`longitud`) en la parte superior.
 
 <div align="center">
-  <img src="assets/capturas/p1-permiso-concedido.png" width="280" alt="Permiso concedido: cámara activa con coordenadas" />
+  <img src="./assets/capturas/p1-permiso-concedido.png" width="280" alt="Permiso concedido: cámara activa con coordenadas" />
 </div>
 
 
@@ -220,34 +220,49 @@ photos
 
 ---
 
-### Capturas de pantalla de la Semana 7
+### Galería de Capturas (Semana 7)
 
-Guarda las capturas de la Semana 7 en `assets/capturas/`:
-
-| Archivo | Pantalla a capturar | Qué debe verse |
-| --- | --- | --- |
-| `09-biblioteca.png` | **Pestaña Biblioteca** (`/biblioteca`) | Listado completo de fotografías guardadas, contador en la cabecera y barra de filtros. |
-| `10-detalle-foto.png` | **Detalle de Foto** (`/foto/[id]`) | Fotografía a pantalla completa, nota editada, botón de favorita activado (`★ Favorita`) y selector de álbum. |
-| `11-menu-busqueda-centrado.png` | **Menú de búsqueda centrado** | Diálogo modal centrado abierto al presionar la burbuja flotante con la lupita en el Mapa o Biblioteca. |
-| `12-filtro-favoritas-albumes.png` | **Filtros activos** | Vista filtrada mostrando solo fotos favoritas o pertenecientes a un álbum específico, con la burbuja indicando el estado activo. |
-| `13-crear-album.png` | **Creación de álbum** | Formulario para crear un nuevo álbum desde el menú de filtros y actualización en tiempo real de los chips. |
+<table>
+  <tr>
+    <td align="center" width="300">
+      <img src="./assets/capturas/09-biblioteca.png" width="260" alt="Biblioteca" /><br>
+      <sub><b>09</b> · Pestaña Biblioteca</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="./assets/capturas/10-detalle-foto.png" width="260" alt="Detalle de Foto" /><br>
+      <sub><b>10</b> · Detalle CRUD de Foto</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="./assets/capturas/11-menu-busqueda-centrado.png" width="260" alt="Búsqueda centrada" /><br>
+      <sub><b>11</b> · Menú de búsqueda centrado</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="300">
+      <img src="./assets/capturas/12-filtro-favoritas-albumes.png" width="260" alt="Filtros activos" /><br>
+      <sub><b>12</b> · Filtro por favoritas y álbumes</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="./assets/capturas/13-crear-album.png" width="260" alt="Crear álbum" /><br>
+      <sub><b>13</b> · Creación de nuevo álbum</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
-### Video demostrativo del flujo (.mp4)
+### Video demostrativo del flujo CRUD y Persistencia
 
-Guarda la grabación de pantalla como **`assets/capturas/demostracion-flujo.mp4`** (o `.gif`).
+[![Ver Video Demostrativo](./assets/capturas/11-menu-busqueda-centrado.png)](./assets/capturas/demostracion-flujo.mp4)
 
-**Qué debe mostrar el video:**
-1. Toma de 3 fotografías geolocalizadas con la cámara.
+🎬 **[Haz clic aquí para ver o descargar el Video Demostración (demostracion-flujo.mp4)](./assets/capturas/demostracion-flujo.mp4)**
+
+**Demostración del flujo:**
+1. Toma de fotografías geolocalizadas con la cámara.
 2. Edición de notas, marcado como favorita y asignación a un álbum en la pantalla de detalle.
 3. Apertura del menú centrado desde la burbuja flotante de la lupita y filtrado por nota.
-4. Cierre completo de Expo Go / App y reapertura comprobando que las fotos y sus coordenadas persisten.
+4. Cierre completo de la app / Expo Go y reapertura comprobando que las fotos y sus coordenadas persisten en SQLite.
 5. Verificación en modo avión.
-
-```html
-<video src="assets/capturas/demostracion-flujo.mp4" controls width="100%"></video>
-```
 
 ---
 
