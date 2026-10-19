@@ -120,3 +120,71 @@ Registro de Auditoría de IA (AI-LOG) para el desarrollo de GeoCam en la **Seman
 * **ESLint**: `npx eslint .` completado con `0 errores`.
 * **Migraciones**: 3 migraciones SQL generadas con `drizzle-kit generate` y registradas en `drizzle/migrations.js`.
 * **Reto Opcional**: Índice `photos_created_at_idx` creado en migración `0002` y verificado con el script `src/utils/benchmark.ts`.
+
+---
+
+# Semana 8 — Backend as a Service con Supabase (GeoCam en la nube)
+
+**Proyecto:** GeoCam en la nube – Taller Integrador 2 (Semana 8)
+
+---
+
+## 1. Prompts utilizados
+
+**Prompt 1 — Arquitectura BaaS y Selección de Plataforma:** Analizar las alternativas para Backend as a Service (BaaS). Al encontrar que Firebase Cloud Storage exige tarjeta de crédito y plan de facturación de pago (Blaze) para crear buckets en proyectos nuevos, migrar a Supabase (PostgreSQL remoto + Supabase Auth + Supabase Storage privado + WebSockets Realtime), alineado 100% con la guía de la Semana 8 y totalmente gratuito sin tarjeta.
+
+**Prompt 2 — Dependencias y Persistencia Segura:** Instalar `@supabase/supabase-js`, `expo-secure-store` y `expo-crypto`, configurar `.env`, `.env.example` y construir un adaptador seguro de almacenamiento por fragmentos (`src/lib/secureStorage.ts`) que fragmenta tokens JWT en trozos de 1000 caracteres para sortear el límite histórico del Keychain en iOS (~2048 bytes).
+
+**Prompt 3 — Migración 0003 en SQLite y Repositorios:** Diseñar la migración 0003 en SQLite para añadir `client_id`, `updated_at`, `remote_path`, `synced_at` y `owner_id`. Implementar `ensureSyncFields()` y preparar `usePhotos` y `photosRepo` para aislamiento local multi-usuario (Tarea C5).
+
+**Prompt 4 — Subida Binaria, Rollback y Sincronización:** Implementar `src/services/cloudPhotos.ts` con subida binaria (`ArrayBuffer`) a bucket privado `geocam`, prevención de huérfanos con rollback inmediato, borrado coherente (cascada Storage -> PostgreSQL -> SQLite), sincronización por lotes con indicador de progreso dinámico ("3 de 7") en la Biblioteca y la nueva pestaña `src/app/(tabs)/nube.tsx` con URLs firmadas y suscripción en tiempo real (`supabase_realtime`).
+
+---
+
+## 2. Código generado vs. modificado (Semana 8)
+
+### Archivos creados o modificados en la Semana 8
+
+| Archivo | Responsabilidad |
+| --- | --- |
+| `src/lib/secureStorage.ts` | Adaptador sobre `expo-secure-store` con fragmentación en chunks de 1000 caracteres para guardar tokens de sesión de Supabase sin desbordar el Keychain de iOS. |
+| `src/lib/supabase.ts` | Cliente Supabase singleton configurado con `secureStorage`, refresco automático y sincronización de estado de aplicación (foreground/background). |
+| `src/context/AuthContext.tsx` | Proveedor y hook `useAuth()` para manejo de sesión con Supabase Auth: `signIn`, `signUp`, `signOut` y mapeo de errores a español. |
+| `src/app/login.tsx` | Pantalla de inicio de sesión y registro con diseño visual adaptado a los tokens de GeoCam. |
+| `src/app/_layout.tsx` | Integración de `AuthProvider`, rutas privadas protegidas con `<Stack.Protected guard={!!user}>` y llamada a `ensureSyncFields()`. |
+| `db/schema.ts` | Esquema SQLite actualizado con columnas `clientId`, `updatedAt`, `remotePath`, `syncedAt` y `ownerId`, utilizando generador UUID independiente sin acoplamiento a React Native. |
+| `drizzle/0003_curly_beyonder.sql` | Cuarta migración de SQLite generada y registrada en `drizzle/migrations.js`. |
+| `db/repositories/photos.ts` | Repositorio extendido con `markSynced`, `ensureSyncFields`, `listUnsynced` y filtrado multi-usuario por `ownerId`. |
+| `src/services/cloudPhotos.ts` | Subida a bucket privado `geocam` como `ArrayBuffer`, rollback de archivos huérfanos, inserción/upsert idempotente en PostgreSQL, borrado coherente y escucha reactiva en tiempo real. |
+| `src/hooks/usePhotos.ts` | Integración de `ownerId` de la sesión activa, borrado sincronizado en cascada y función `syncPending`. |
+| `src/app/(tabs)/biblioteca.tsx` | Botón interactivo de sincronización por lotes con contador dinámico de avance ("3 de 7") y botón de cierre de sesión. |
+| `src/app/(tabs)/nube.tsx` | Nueva pestaña de fotos en la nube en tiempo real mediante URLs firmadas (`createSignedUrl`) y `postgres_changes`. |
+| `src/app/foto/[id].tsx` | Indicador de estado de sincronización (☁️ Nube / Local) y botón manual *"Subir a la nube"*. |
+| `src/components/GeoPhotoCard.tsx` | Chip distintivo de nube en fotos sincronizadas. |
+| `src/components/app-tabs.tsx` & `app-tabs.web.tsx` | Pestaña "Nube" añadida con icono de nube para navegación principal. |
+| `supabase.sql` | Script SQL completo con creación de tabla `photos`, políticas RLS estrictas (`auth.uid() = user_id`), bucket privado `geocam`, políticas de Storage y publicación en tiempo real. |
+| `.env.example` & `.gitignore` | Protección estricta de credenciales en el repositorio. |
+
+---
+
+## 3. Alucinaciones y Errores Detectados y Corregidos (Semana 8)
+
+| La IA genera / Error detectado | Problema | Corrección aplicada | Cómo se verificó |
+| --- | --- | --- | --- |
+| Paywall en Firebase Storage | Google Firebase requiere tarjeta de crédito para crear buckets de Storage en cuentas nuevas. | Se migró a Supabase (PostgreSQL + Auth + Storage privado + Realtime), 100% gratuito sin tarjeta de crédito. | Guía oficial Semana 8 cumplida y script `supabase.sql` listo. |
+| `import * as Crypto from 'expo-crypto'` en `db/schema.ts` | `drizzle-kit generate` falló con error de esbuild: `Unexpected "typeof" in react-native/index.js` al correr en entorno Node. | Se implementó una función `generateUUID()` pura basada en `globalThis.crypto?.randomUUID()`. | `npx drizzle-kit generate` ejecutó limpiamente la migración `0003`. |
+| `react-hooks/set-state-in-effect` en `nube.tsx` | React Compiler / ESLint advirtió sobre llamadas síncronas a `setIsLoading` / `loadPhotos` dentro de `useEffect`. | Se inicializó el estado con función evaluada y se desacopló la recarga con actualización optimista y promesas con guard `isMounted`. | `npx expo lint` pasó con 0 advertencias y 0 errores. |
+| Inconsistencia de dependencias en `useCallback` | ESLint `react-hooks/preserve-manual-memoization` falló al usar `[user?.id]` cuando la inferencia del compilador esperaba `[user]`. | Se unificaron las dependencias a `[user]` en todas las acciones de `usePhotos.ts`. | `npx expo lint` completó en verde. |
+| Subida con `FormData` o `Blob` nativo en React Native | Provoca archivos subidos corruptos o de 0 bytes en buckets de Storage. | Se convirtió la imagen a `ArrayBuffer` a través de `fetch(uri).then(r => r.arrayBuffer())`. | Subida binaria íntegra garantizada. |
+| Archivos huérfanos al fallar base remota | Si la imagen sube a Storage pero el `upsert` falla en PostgreSQL, el archivo queda ocupando espacio. | Bloque `try/catch` en `uploadPhoto`: si la inserción en base falla, se ejecuta `remove([storagePath])` inmediatamente. | `src/services/cloudPhotos.ts`. |
+| Desbordamiento de Keychain en iOS (>2048 bytes) | Los tokens de sesión y JWT de Supabase pueden exceder el límite seguro de almacenamiento del Keychain en iOS. | Adaptador `src/lib/secureStorage.ts` que fragmenta cadenas largas en chunks numerados de 1000 caracteres. | `src/lib/secureStorage.ts`. |
+
+---
+
+## 4. Verificación de la Semana 8
+
+* **TypeScript**: `npx tsc --noEmit` verificado con `0 errores`.
+* **ESLint**: `npx expo lint` verificado con `0 errores` y `0 advertencias`.
+* **Migraciones Drizzle**: Migración `0003_curly_beyonder.sql` generada y registrada en `migrations.js`.
+* **Auditoría de Credenciales**: Ejecutado `git log --all --full-history -- .env` con resultado vacío (0 commits), confirmando que las credenciales jamás se han expuesto en el historial.
+

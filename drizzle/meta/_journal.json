@@ -22,6 +22,13 @@
       "when": 1791322314860,
       "tag": "0002_chemical_cargill",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792357839558,
+      "tag": "0003_curly_beyonder",
+      "breakpoints": true
     }
   ]
 }

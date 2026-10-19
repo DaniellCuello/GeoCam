@@ -35,4 +35,5 @@ export const Icons = {
   chevron: { ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' },
   search: { ios: 'magnifyingglass', android: 'search', web: 'search' },
   close: { ios: 'xmark', android: 'close', web: 'close' },
+  cloud: { ios: 'icloud.fill', android: 'cloud', web: 'cloud' },
 } as const satisfies Record<string, AppIcon>;

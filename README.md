@@ -271,6 +271,169 @@ photos
 
 ---
 
+## Semana 8 — Backend as a Service con Supabase (Nube y Sincronización)
+
+### Objetivo
+
+Conectar GeoCam a un **Backend as a Service (BaaS)** mediante **Supabase**: registro e inicio de sesión con correo y contraseña, almacenamiento seguro de sesión en el dispositivo (`expo-secure-store`), base de datos remota protegida con **Row Level Security (RLS)** en PostgreSQL, almacenamiento de imágenes en un bucket privado de **Supabase Storage** y sincronización en tiempo real con WebSockets (`supabase_realtime`), manteniendo SQLite local como fuente de verdad offline-first.
+
+---
+
+### Diagrama de Arquitectura Híbrida (Local vs Nube)
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                    DISPOSITIVO MÓVIL                         │
+│                                                              │
+│  ┌─────────────────────────┐     ┌────────────────────────┐  │
+│  │   expo-secure-store     │     │     SQLite + Drizzle   │  │
+│  │  (Sesión JWT fragmentada│     │  (Fuente de verdad     │  │
+│  │   en chunks de 1000 ch) │     │   local por ownerId)   │  │
+│  └────────────▲────────────┘     └───────────▲────────────┘  │
+│               │ (Token JWT)                  │ (Offline-first)│
+│  ┌────────────┴──────────────────────────────┴────────────┐  │
+│  │               GeoCam App (Expo Router)                 │  │
+│  │       Stack.Protected (guard={!!user})                 │  │
+│  └───────┬───────────────────────────────┬────────────────┘  │
+└──────────┼───────────────────────────────┼───────────────────┘
+           │ (HTTPS / Realtime WebSockets) │ (ArrayBuffer Upload)
+           ▼                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                  SUPABASE (BaaS en la nube)                  │
+│                                                              │
+│  ┌────────────────────────┐      ┌────────────────────────┐  │
+│  │     Supabase Auth      │      │    Supabase Storage    │  │
+│  │ (Usuarios y Tokens JWT)│      │  Bucket privado geocam │  │
+│  └───────────┬────────────┘      │  /<userId>/<id>.jpg    │  │
+│              │ (auth.uid())      └───────────▲────────────┘  │
+│              ▼                               │ (Storage RLS)  │
+│  ┌───────────────────────────────────────────┴────────────┐  │
+│  │ PostgreSQL Remoto (Tabla public.photos)                 │  │
+│  │ Políticas RLS: auth.uid() = user_id                    │  │
+│  │ Publicación en tiempo real (supabase_realtime)         │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Novedades y Funcionalidades de la Semana 8
+
+1. **Autenticación con Supabase Auth y Rutas Protegidas (`app/_layout.tsx`, `app/login.tsx`)**:
+   - Registro e inicio de sesión con correo y contraseña usando `@supabase/supabase-js`.
+   - Rutas privadas (`(tabs)` y `foto/[id]`) protegidas con `<Stack.Protected guard={!!user}>`.
+   - Navegación automática y reactiva al iniciar o cerrar sesión sin necesidad de `router.replace` manual.
+
+2. **Almacenamiento Seguro de Sesión en Fragmentos (`src/lib/secureStorage.ts`)**:
+   - Adaptador sobre `expo-secure-store` que fragmenta tokens de sesión en trozos de 1000 caracteres, superando el límite histórico de ~2048 bytes del Keychain en iOS.
+
+3. **Migración 0003 en SQLite (`drizzle/0003_curly_beyonder.sql`)**:
+   - `client_id`: UUID único persistente generado en el dispositivo para vincular la foto local con su fila remota.
+   - `updated_at`: Marca de tiempo de última edición de la foto (nota, favorito o álbum).
+   - `remote_path`: Ruta del archivo en el bucket `geocam` de Supabase Storage.
+   - `synced_at`: Fecha y hora de la última sincronización en la nube.
+   - `owner_id`: Identificador del usuario autenticado para separar fotos locales en dispositivos multi-usuario (Tarea C5).
+   - Función `ensureSyncFields()` para rellenar fotos históricas al iniciar la app.
+
+4. **Subida Idempotente y Limpieza de Huérfanos (`src/services/cloudPhotos.ts` - Tareas T5 y C2)**:
+   - Sube la imagen a `geocam/<userId>/<clientId>.jpg` como `ArrayBuffer`, previniendo archivos corruptos de 0 bytes en React Native.
+   - Inserta los metadatos en PostgreSQL usando `client_id` con cláusula `upsert` (evita duplicados si se reintenta).
+   - Si la inserción en la base de datos remota falla, **se elimina inmediatamente el archivo del bucket** para evitar huérfanos.
+
+5. **Sincronización por Lotes con Progreso (`src/app/(tabs)/biblioteca.tsx` - Tarea C1)**:
+   - Botón *"☁️ Sincronizar pendientes con Supabase"* que recorre todas las fotos con `syncedAt` nulo o anterior a `updatedAt`.
+   - Muestra indicador de avance dinámico (`"Sincronizando 3 de 7…"`).
+   - Si una fotografía individual falla, el proceso continúa con las demás y reporta el balance al finalizar.
+
+6. **Borrado Coherente Local y Remoto (Tarea C3)**:
+   - Al eliminar una foto sincronizada, se eliminan en cascada su archivo en Supabase Storage, su fila en PostgreSQL y el registro/archivo físico local.
+   - Sin conexión a internet, la app avisa y aborta la operación para evitar estados desincronizados a medias.
+
+7. **Pestaña Nube en Tiempo Real (`src/app/(tabs)/nube.tsx` - Tarea C4)**:
+   - Nueva pestaña que consulta las fotos del usuario en Supabase mediante imágenes con URL firmadas (`createSignedUrl`) y listener reactivo `postgres_changes`.
+   - Permite visualizar las fotos cargadas en la nube desde cualquier dispositivo donde el usuario inicie sesión.
+
+8. **Datos Locales Aislados por Usuario (`ownerId` - Tarea C5)**:
+   - Las consultas locales de SQLite se filtran por `photos.ownerId == user.id`. Al cambiar de cuenta en el mismo celular, no se mezclan las fotos del usuario anterior.
+
+---
+
+### SQL Completo de Tablas y Políticas RLS (`supabase.sql`)
+
+```sql
+-- 1. Tabla remota 'photos'
+create table public.photos (
+  id bigint generated always as identity primary key,
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  client_id text not null unique,        -- UUID creado en el teléfono
+  storage_path text not null unique,     -- Ruta en el bucket
+  latitude double precision,
+  longitude double precision,
+  accuracy double precision,
+  note text,
+  favorite boolean not null default false,
+  source text not null check (source in ('camera', 'gallery')),
+  taken_at timestamptz not null,
+  updated_at timestamptz not null,       -- Última modificación hecha por el usuario
+  created_at timestamptz not null default now()
+);
+
+-- 2. Habilitar RLS en 'photos'
+alter table public.photos enable row level security;
+
+create policy "ver las mías" on public.photos
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+create policy "crear las mías" on public.photos
+  for insert to authenticated with check ((select auth.uid()) = user_id);
+
+create policy "actualizar las mías" on public.photos
+  for update to authenticated using ((select auth.uid()) = user_id);
+
+create policy "borrar las mías" on public.photos
+  for delete to authenticated using ((select auth.uid()) = user_id);
+
+-- 3. Publicación en tiempo real (Supabase Realtime)
+alter publication supabase_realtime add table public.photos;
+
+-- 4. Bucket privado 'geocam'
+insert into storage.buckets (id, name, public) values ('geocam', 'geocam', false);
+
+-- 5. Políticas de seguridad en storage.objects
+create policy "subir a mi carpeta" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'geocam' and (storage.foldername(name))[1] = (select auth.uid()::text)
+  );
+
+create policy "leer mi carpeta" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'geocam' and (storage.foldername(name))[1] = (select auth.uid()::text)
+  );
+
+create policy "borrar de mi carpeta" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'geocam' and (storage.foldername(name))[1] = (select auth.uid()::text)
+  );
+```
+
+---
+
+### Auditoría de Credenciales (Tarea C6)
+
+1. **`.env` fuera del historial de Git**:
+   ```bash
+   git log --all --full-history -- .env
+   # Resultado: Salida vacía (0 resultados). .env jamás ha entrado a un commit.
+   ```
+2. **`.env` ignorado**: Declarado en `.gitignore`.
+3. **`.env.example` versionado**: Plantilla con `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` sin valores sensibles.
+4. **Cero secret keys en el código**: Únicamente se emplean variables públicas (`EXPO_PUBLIC_`). La seguridad recae 100% en Row Level Security (RLS) dentro de PostgreSQL y Storage.
+
+---
+
 ## Ejecutar el proyecto
 
 ```bash

@@ -7,9 +7,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, Layout, Radii, Spacing } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { useAlbums } from '@/hooks/useAlbums';
 import { usePhoto, usePhotoActions } from '@/hooks/usePhotos';
 import { useTheme } from '@/hooks/use-theme';
+import { uploadPhoto } from '@/services/cloudPhotos';
 import { confirmAction } from '@/utils/confirm';
 import { toErrorMessage } from '@/utils/errors';
 import { formatCoords, formatTimestamp, photoCoords } from '@/utils/geo-format';
@@ -21,11 +23,31 @@ export default function PhotoDetailScreen() {
   const { photo, error: queryError } = usePhoto(safePhotoId);
   const { updatePhoto, removePhoto } = usePhotoActions();
   const { albums, error: albumsError } = useAlbums();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const [noteDraft, setNoteDraft] = useState<{ photoId: number; value: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const note = photo && noteDraft?.photoId === photo.id ? noteDraft.value : photo?.note ?? '';
+
+  const handleUploadCloud = async () => {
+    if (!photo) return;
+    if (!user?.id) {
+      setError('Debes iniciar sesión para subir fotos a Supabase.');
+      return;
+    }
+
+    setIsUploading(true);
+    setError(null);
+    try {
+      await uploadPhoto(photo, user.id);
+    } catch (cause) {
+      setError(toErrorMessage(cause, 'Error al subir la fotografía a Supabase.'));
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleSaveNote = async () => {
     if (!photo) {
@@ -132,6 +154,40 @@ export default function PhotoDetailScreen() {
               Guardar nota
             </ThemedText>
           </Pressable>
+
+          <View style={styles.syncContainer}>
+            <View
+              style={[
+                styles.syncBadge,
+                photo.syncedAt ? styles.syncBadgeSynced : styles.syncBadgePending,
+              ]}
+            >
+              <ThemedText
+                type="smallBold"
+                style={photo.syncedAt ? styles.syncTextSynced : styles.syncTextPending}
+              >
+                {photo.syncedAt ? '☁️ Sincronizada en la nube' : '☁️ Local (No subida)'}
+              </ThemedText>
+            </View>
+
+            <Pressable
+              disabled={isUploading}
+              onPress={() => void handleUploadCloud()}
+              accessibilityRole="button"
+              style={[
+                styles.cloudButton,
+                { opacity: isUploading ? 0.7 : 1 },
+              ]}
+            >
+              <ThemedText type="smallBold" style={styles.cloudButtonText}>
+                {isUploading
+                  ? 'Subiendo a Firebase…'
+                  : photo.syncedAt
+                  ? 'Volver a subir a la nube'
+                  : 'Subir a la nube'}
+              </ThemedText>
+            </Pressable>
+          </View>
 
           <Pressable
             onPress={() =>
@@ -264,6 +320,43 @@ const styles = StyleSheet.create({
   },
   favoriteActive: {
     color: Brand.primary,
+  },
+  syncContainer: {
+    gap: Spacing.two,
+    marginVertical: Spacing.one,
+  },
+  syncBadge: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Radii.sm,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  syncBadgeSynced: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  syncBadgePending: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  syncTextSynced: {
+    color: '#065F46',
+  },
+  syncTextPending: {
+    color: '#92400E',
+  },
+  cloudButton: {
+    minHeight: Layout.minTouch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Brand.primaryDeep ?? '#1E3A8A',
+    borderRadius: Radii.pill,
+    paddingHorizontal: Spacing.four,
+  },
+  cloudButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   albums: {
     flexDirection: 'row',

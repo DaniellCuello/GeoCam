@@ -54,7 +54,16 @@ export function GeoPhotoCard({ photo, onRemove, style }: GeoPhotoCardProps) {
       <Image source={{ uri: photo.uri }} style={styles.thumbnail} contentFit="cover" />
 
       <View style={styles.body}>
-        <SourceBadge source={photo.source} />
+        <View style={styles.badgeRow}>
+          <SourceBadge source={photo.source} />
+          {photo.syncedAt ? (
+            <View style={styles.cloudBadge}>
+              <ThemedText type="smallBold" style={styles.cloudBadgeText}>
+                ☁️ Nube
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
 
         <ThemedText type="code" numberOfLines={1}>
           {formatCoords(coords)}
@@ -130,6 +139,23 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     gap: Spacing.one,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  cloudBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 2,
+    borderRadius: Radii.pill,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  cloudBadgeText: {
+    fontSize: 11,
+    color: '#1D4ED8',
   },
   remove: {
     flexDirection: 'row',

@@ -33,6 +33,11 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon sf="photo.stack.fill" md="collections" />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="nube">
+        <NativeTabs.Trigger.Label>Nube</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="icloud.fill" md="cloud" />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="mapa">
         <NativeTabs.Trigger.Label>Mapa</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="map.fill" md="map" />
