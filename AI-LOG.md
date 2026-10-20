@@ -164,6 +164,7 @@ Registro de Auditoría de IA (AI-LOG) para el desarrollo de GeoCam en la **Seman
 | `src/components/app-tabs.tsx` & `app-tabs.web.tsx` | Pestaña "Nube" añadida con icono de nube para navegación principal. |
 | `supabase.sql` | Script SQL completo con creación de tabla `photos`, políticas RLS estrictas (`auth.uid() = user_id`), bucket privado `geocam`, políticas de Storage y publicación en tiempo real. |
 | `.env.example` & `.gitignore` | Protección estricta de credenciales en el repositorio. |
+| `assets/capturas/14-20.png` | 7 evidencias visuales de la Semana 8: Registro, Login, Pestaña Nube, Sincronización en Biblioteca, Progreso de subida, Aislamiento multi-usuario y Consola remota de Supabase con tabla PostgreSQL y Storage. |
 
 ---
 

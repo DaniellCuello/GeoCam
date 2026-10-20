@@ -358,6 +358,47 @@ Conectar GeoCam a un **Backend as a Service (BaaS)** mediante **Supabase**: regi
 
 ---
 
+### Galería de Capturas y Evidencias (Semana 8)
+
+<table>
+  <tr>
+    <td align="center" width="300">
+      <img src="./assets/capturas/14-Registrarse.png" width="260" alt="Registro con Supabase Auth" /><br>
+      <sub><b>14</b> · Registro con Supabase Auth</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="./assets/capturas/15-Ingresar.png" width="260" alt="Inicio de sesión" /><br>
+      <sub><b>15</b> · Inicio de sesión seguro</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="./assets/capturas/16-Nube.png" width="260" alt="Pestaña Nube" /><br>
+      <sub><b>16</b> · Pestaña Nube en tiempo real</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="300">
+      <img src="./assets/capturas/17-Sincronizar.png" width="260" alt="Sincronizar pendientes" /><br>
+      <sub><b>17</b> · Sincronización por lotes en Biblioteca</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="./assets/capturas/18-Subiendo.png" width="260" alt="Progreso de subida" /><br>
+      <sub><b>18</b> · Subida e indicador de progreso</sub>
+    </td>
+    <td align="center" width="300">
+      <img src="./assets/capturas/19-Cuenta-nueva.png" width="260" alt="Aislamiento multi-usuario" /><br>
+      <sub><b>19</b> · Aislamiento multi-usuario (cuenta nueva)</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="3">
+      <img src="./assets/capturas/20-Base%20de%20Datos%20-%20Supabase.png" width="750" alt="Consola de Supabase" /><br>
+      <sub><b>20</b> · Consola de Supabase: Tabla PostgreSQL con RLS y Storage privado</sub>
+    </td>
+  </tr>
+</table>
+
+---
+
 ### SQL Completo de Tablas y Políticas RLS (`supabase.sql`)
 
 ```sql
