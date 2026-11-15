@@ -1,27 +1,44 @@
+// src/app/(tabs)/nube.tsx
+// Semana 9: Pestaña Nube con TanStack Query (C2)
+// Características:
+// - Paginación por cursor e infinite scroll en FlatList (useInfiniteQuery).
+// - Búsqueda en vivo por nota con retraso controlado (useDebouncedValue).
+// - Los cuatro estados de UI: Carga inicial, Error con reintento, Vacío y Sin conexión.
+// - Persistencia offline de caché (C3) y actualización en tiempo real mediante WebSockets.
+
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 
 import { EmptyState } from '@/components/EmptyState';
 import { SourceBadge } from '@/components/SourceBadge';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Brand, Layout, Radii, Spacing } from '@/constants/theme';
+import { Brand, Layout, Night, Radii, Spacing } from '@/constants/theme';
 import { Icons } from '@/constants/icons';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useIsOnline } from '@/lib/queryClient';
 import {
   deleteCloudPhoto,
-  listCloudPhotos,
+  listCloudPhotosPage,
   subscribeToUserCloudPhotos,
   type CloudPhoto,
 } from '@/services/cloudPhotos';
@@ -33,63 +50,59 @@ export default function NubeScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const isOnline = useIsOnline();
 
-  const [photos, setPhotos] = useState<CloudPhoto[]>([]);
-  const [isLoading, setIsLoading] = useState(() => !!user?.id);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 400);
 
+  // Consulta infinita paginada por cursor en Supabase
+  const {
+    data,
+    status,
+    fetchStatus,
+    error,
+    refetch,
+    isRefetching,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['cloudPhotos', { userId: user?.id, search: debouncedSearch }],
+    queryFn: ({ pageParam }) =>
+      listCloudPhotosPage({
+        userId: user!.id,
+        cursor: pageParam,
+        search: debouncedSearch,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: !!user?.id,
+    placeholderData: keepPreviousData, // Evita parpadeo al teclear
+  });
+
+  // Aplanar páginas en una sola lista para el FlatList
+  const photos = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data]
+  );
+
+  // Suscripción reactiva en tiempo real: invalida la caché de TanStack Query
   useEffect(() => {
-    if (!user?.id) {
-      return;
-    }
+    if (!user?.id) return;
 
-    let isMounted = true;
-
-    listCloudPhotos(user.id)
-      .then((data) => {
-        if (isMounted) {
-          setPhotos(data);
-          setIsLoading(false);
-          setErrorMsg(null);
-        }
-      })
-      .catch((err) => {
-        if (isMounted) {
-          setErrorMsg(toErrorMessage(err, 'No se pudieron cargar las fotos de Supabase.'));
-          setIsLoading(false);
-        }
-      });
-
-    // C4: Escucha reactiva en tiempo real con postgres_changes
     const unsubscribe = subscribeToUserCloudPhotos(() => {
-      listCloudPhotos(user.id)
-        .then((data) => {
-          if (isMounted) {
-            setPhotos(data);
-          }
-        })
-        .catch((err) => {
-          console.warn('Error en actualización realtime:', err);
-        });
+      queryClient.invalidateQueries({ queryKey: ['cloudPhotos'] });
     });
 
     return () => {
-      isMounted = false;
       unsubscribe();
     };
-  }, [user?.id]);
+  }, [user?.id, queryClient]);
 
-  const handleDeleteRemote = async (photo: CloudPhoto) => {
-    const confirmed = await confirmAction({
-      title: 'Eliminar de la nube',
-      message: 'Se eliminará la foto de Supabase Storage y su fila en PostgreSQL.',
-      confirmLabel: 'Eliminar',
-      destructive: true,
-    });
-
-    if (!confirmed || !user?.id) return;
-
-    try {
+  // Mutación para borrar foto remota
+  const deleteMutation = useMutation({
+    mutationFn: async (photo: CloudPhoto) => {
       await deleteCloudPhoto(
         {
           id: 0,
@@ -107,13 +120,91 @@ export default function NubeScreen() {
           favorite: photo.favorite,
           syncedAt: new Date(),
           ownerId: photo.user_id,
+          deletedAt: null,
         },
-        user.id
+        user!.id
       );
-      setPhotos((prev) => prev.filter((p) => p.client_id !== photo.client_id));
-    } catch (err) {
-      setErrorMsg(toErrorMessage(err, 'No se pudo eliminar de la nube.'));
-    }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cloudPhotos'] });
+    },
+  });
+
+  const handleDeleteRemote = async (photo: CloudPhoto) => {
+    const confirmed = await confirmAction({
+      title: 'Eliminar de la nube',
+      message: 'Se eliminará la foto de Supabase Storage y su fila en PostgreSQL.',
+      confirmLabel: 'Eliminar',
+      destructive: true,
+    });
+
+    if (!confirmed || !user?.id) return;
+    deleteMutation.mutate(photo);
+  };
+
+  const renderItem = ({ item }: { item: CloudPhoto }) => {
+    const coordsText =
+      item.latitude !== null && item.longitude !== null
+        ? formatCoords({ latitude: item.latitude, longitude: item.longitude, accuracy: null })
+        : 'Sin ubicación GPS';
+
+    return (
+      <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        <View style={styles.imageWrap}>
+          {item.signedUrl ? (
+            <Image
+              source={{ uri: item.signedUrl }}
+              style={styles.image}
+              contentFit="cover"
+              transition={200}
+            />
+          ) : (
+            <View style={styles.imageFallback}>
+              <ActivityIndicator color={Brand.primary} />
+            </View>
+          )}
+
+          <View style={styles.badgeTopLeft}>
+            <SourceBadge source={item.source} />
+          </View>
+          {item.favorite ? (
+            <View style={styles.favoriteBadge}>
+              <ThemedText style={styles.favoriteText}>★</ThemedText>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.cardBody}>
+          <ThemedText type="code" style={styles.coords} numberOfLines={1}>
+            📍 {coordsText}
+          </ThemedText>
+
+          {item.note ? (
+            <ThemedText type="default" numberOfLines={3} style={styles.note}>
+              {item.note}
+            </ThemedText>
+          ) : null}
+
+          <View style={styles.footer}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {formatTimestamp(new Date(item.taken_at))}
+            </ThemedText>
+
+            <Pressable
+              onPress={() => void handleDeleteRemote(item)}
+              accessibilityRole="button"
+              accessibilityLabel="Eliminar foto de la nube"
+              style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
+            >
+              <SymbolView name={Icons.trash} size={16} tintColor={Brand.danger} />
+              <ThemedText type="smallBold" style={styles.deleteText}>
+                Eliminar
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -121,6 +212,7 @@ export default function NubeScreen() {
       <FlatList
         data={photos}
         keyExtractor={(item) => String(item.id || item.client_id)}
+        renderItem={renderItem}
         contentContainerStyle={[
           styles.content,
           {
@@ -128,117 +220,124 @@ export default function NubeScreen() {
             paddingBottom: insets.bottom + Spacing.five,
           },
         ]}
+        refreshing={isRefetching && !isFetchingNextPage}
+        onRefresh={() => void refetch()}
+        onEndReachedThreshold={0.4}
+        onEndReached={() => {
+          if (hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage();
+          }
+        }}
         ListHeaderComponent={
           <View style={styles.header}>
             <View style={styles.titleRow}>
-              <ThemedText type="title" accessibilityRole="header">
-                Fotos en la Nube
-              </ThemedText>
-              <View style={styles.badge}>
-                <ThemedText type="smallBold" style={styles.badgeText}>
+              <View>
+                <ThemedText type="title" accessibilityRole="header">
+                  Fotos en la Nube
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Feed paginado en tiempo real con TanStack Query
+                </ThemedText>
+              </View>
+
+              <View style={styles.cloudBadge}>
+                <ThemedText type="smallBold" style={styles.cloudBadgeText}>
                   ☁️ Supabase
                 </ThemedText>
               </View>
             </View>
 
-            <ThemedText type="small" themeColor="textSecondary">
-              {isLoading
-                ? 'Cargando fotos remotas…'
-                : photos.length === 0
-                ? 'No hay fotos sincronizadas en la nube'
-                : `${photos.length} ${
-                    photos.length === 1 ? 'foto sincronizada' : 'fotos sincronizadas'
-                  } en tiempo real`}
-            </ThemedText>
-
-            {errorMsg ? (
-              <View style={styles.errorBox}>
-                <ThemedText type="small" style={styles.errorText}>
-                  {errorMsg}
+            {/* Banner de estado sin conexión */}
+            {!isOnline ? (
+              <View style={styles.offlineBanner}>
+                <ThemedText type="smallBold" style={styles.offlineText}>
+                  🟠 Sin conexión. Mostrando datos guardados en caché.
                 </ThemedText>
               </View>
             ) : null}
-          </View>
-        }
-        renderItem={({ item }) => (
-          <ThemedView
-            type="backgroundElement"
-            style={[styles.card, { borderColor: theme.border }]}
-          >
-            {item.signedUrl ? (
-              <Image
-                source={{ uri: item.signedUrl }}
-                style={styles.thumbnail}
-                contentFit="cover"
+
+            {/* Buscador reactivo por nota */}
+            <View style={[styles.searchBox, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+              <SymbolView name={Icons.search} size={16} tintColor={theme.textSecondary} />
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Buscar por nota en la nube…"
+                placeholderTextColor={theme.textSecondary}
+                style={[styles.searchInput, { color: theme.text }]}
+                returnKeyType="search"
+                autoCapitalize="none"
               />
-            ) : (
-              <View style={[styles.thumbnail, styles.noThumb]}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  📷
-                </ThemedText>
-              </View>
-            )}
-
-            <View style={styles.cardBody}>
-              <View style={styles.metaRow}>
-                <SourceBadge source={item.source} />
-                {item.favorite ? (
-                  <ThemedText type="smallBold" style={{ color: Brand.primary }}>
-                    ★
-                  </ThemedText>
-                ) : null}
-              </View>
-
-              <ThemedText type="code" numberOfLines={1}>
-                {formatCoords(
-                  item.latitude !== null && item.longitude !== null
-                    ? {
-                        latitude: item.latitude,
-                        longitude: item.longitude,
-                        accuracy: null,
-                      }
-                    : null
-                )}
-              </ThemedText>
-
-              <ThemedText type="small" themeColor="textSecondary">
-                {formatTimestamp(new Date(item.taken_at || item.created_at))}
-              </ThemedText>
-
-              {item.note ? (
-                <ThemedText type="small" numberOfLines={2}>
-                  {item.note}
-                </ThemedText>
+              {search ? (
+                <Pressable onPress={() => setSearch('')} accessibilityLabel="Limpiar búsqueda">
+                  <SymbolView name={Icons.close} size={14} tintColor={theme.textSecondary} />
+                </Pressable>
               ) : null}
             </View>
-
-            <Pressable
-              onPress={() => void handleDeleteRemote(item)}
-              accessibilityRole="button"
-              accessibilityLabel="Eliminar de la nube"
-              style={styles.deleteBtn}
-            >
-              <SymbolView name={Icons.trash} size={16} tintColor={Brand.danger} />
-            </Pressable>
-          </ThemedView>
-        )}
+          </View>
+        }
         ListEmptyComponent={
-          isLoading ? (
-            <View style={styles.loadingWrap}>
-              <ActivityIndicator size="large" color={Brand.primary} />
-              <ThemedText themeColor="textSecondary">Conectando a Supabase…</ThemedText>
-            </View>
-          ) : (
-            <View style={styles.emptyWrap}>
+          <View style={styles.centerBlock}>
+            {/* Estado 1: Carga inicial */}
+            {status === 'pending' && fetchStatus === 'fetching' ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="large" color={Brand.primary} />
+                <ThemedText themeColor="textSecondary" style={{ marginTop: 12 }}>
+                  Cargando galería de la nube…
+                </ThemedText>
+              </View>
+            ) : null}
+
+            {/* Estado 2: Sin datos y sin red */}
+            {status === 'pending' && fetchStatus === 'paused' ? (
               <EmptyState
                 icon={Icons.cloud}
-                title="Sin fotos en la nube"
-                description="Las fotos que subas desde el detalle o mediante 'Sincronizar pendientes' aparecerán aquí en tiempo real y estarán disponibles en cualquier dispositivo al iniciar sesión."
-                actionLabel="Ir a la Biblioteca"
-                onAction={() => router.push('/biblioteca')}
+                title="Sin conexión a internet"
+                description="Conéctate a una red Wi-Fi o datos móviles para consultar las fotos de la nube."
               />
+            ) : null}
+
+            {/* Estado 3: Error con opción de reintentar */}
+            {status === 'error' ? (
+              <View style={styles.errorBox}>
+                <ThemedText type="smallBold" style={{ color: Brand.danger }}>
+                  {toErrorMessage(error, 'No se pudieron consultar las fotos remotas.')}
+                </ThemedText>
+                <Pressable
+                  onPress={() => void refetch()}
+                  style={styles.retryBtn}
+                  accessibilityRole="button"
+                >
+                  <ThemedText type="smallBold" style={styles.retryText}>
+                    Reintentar
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {/* Estado 4: Vacío tras consulta exitosa */}
+            {status === 'success' ? (
+              <EmptyState
+                icon={Icons.cloud}
+                title={debouncedSearch ? 'Sin resultados en la búsqueda' : 'No hay fotos en la nube'}
+                description={
+                  debouncedSearch
+                    ? `No se encontraron fotos que coincidan con "${debouncedSearch}".`
+                    : 'Toma fotos o sube desde la Biblioteca para respaldarlas en tu cuenta.'
+                }
+              />
+            ) : null}
+          </View>
+        }
+        ListFooterComponent={
+          isFetchingNextPage ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator size="small" color={Brand.primary} />
+              <ThemedText type="small" themeColor="textSecondary" style={{ marginLeft: 8 }}>
+                Cargando más fotos…
+              </ThemedText>
             </View>
-          )
+          ) : null
         }
       />
     </ThemedView>
@@ -258,74 +357,158 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: Spacing.two,
-    marginBottom: Spacing.three,
+    marginBottom: Spacing.two,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.two,
   },
-  badge: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
+  cloudBadge: {
+    backgroundColor: 'rgba(32, 138, 239, 0.15)',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 6,
     borderRadius: Radii.pill,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: 'rgba(32, 138, 239, 0.3)',
   },
-  badgeText: {
-    color: '#1D4ED8',
+  cloudBadgeText: {
+    color: Brand.primary,
     fontSize: 12,
   },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.three,
-    borderRadius: Radii.lg,
+  offlineBanner: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderColor: '#F59E0B',
     borderWidth: 1,
-    gap: Spacing.three,
-  },
-  thumbnail: {
-    width: 60,
-    height: 60,
     borderRadius: Radii.md,
-    backgroundColor: '#0000001A',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
-  noThumb: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  offlineText: {
+    color: '#D97706',
+    fontSize: 12,
   },
-  cardBody: {
-    flex: 1,
-    gap: Spacing.one,
-  },
-  metaRow: {
+  searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Radii.lg,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 6,
   },
-  deleteBtn: {
-    minHeight: Layout.minTouch,
-    minWidth: Layout.minTouch,
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+  },
+  card: {
+    borderRadius: Radii.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  imageWrap: {
+    width: '100%',
+    height: 220,
+    backgroundColor: '#000',
+    position: 'relative',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  imageFallback: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Night.fill,
+  },
+  badgeTopLeft: {
+    position: 'absolute',
+    top: Spacing.two,
+    left: Spacing.two,
+  },
+  favoriteBadge: {
+    position: 'absolute',
+    top: Spacing.two,
+    right: Spacing.two,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingWrap: {
-    paddingVertical: Spacing.seven,
-    alignItems: 'center',
-    gap: Spacing.three,
+  favoriteText: {
+    color: '#F59E0B',
+    fontSize: 16,
+    lineHeight: 18,
   },
-  emptyWrap: {
-    paddingVertical: Spacing.seven,
+  cardBody: {
+    padding: Spacing.two,
+    gap: Spacing.one,
+  },
+  coords: {
+    fontSize: 12,
+  },
+  note: {
+    fontSize: 14,
+  },
+  footer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.one,
+    paddingTop: Spacing.one,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: Radii.sm,
+  },
+  deleteBtnPressed: {
+    opacity: 0.6,
+  },
+  deleteText: {
+    color: Brand.danger,
+    fontSize: 12,
+  },
+  centerBlock: {
+    paddingTop: Spacing.four,
+    alignItems: 'center',
+  },
+  loadingBox: {
+    alignItems: 'center',
+    paddingVertical: Spacing.four,
   },
   errorBox: {
-    backgroundColor: Brand.dangerSoft,
     padding: Spacing.three,
     borderRadius: Radii.md,
-    marginTop: Spacing.two,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: Brand.danger,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: Spacing.two,
   },
-  errorText: {
-    color: Brand.danger,
+  retryBtn: {
+    backgroundColor: Brand.primary,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: Radii.pill,
+  },
+  retryText: {
+    color: Brand.onBrand,
+    fontSize: 12,
+  },
+  footerLoader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.three,
   },
 });

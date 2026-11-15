@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PermissionPrimer } from '@/components/PermissionPrimer';
 import { SourceBadge } from '@/components/SourceBadge';
+import { SyncBadge } from '@/components/SyncBadge';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, Layout, Radii, Spacing } from '@/constants/theme';
@@ -208,6 +209,9 @@ export default function GeoCamScreen() {
         ]}
         pointerEvents="box-none">
         <View style={styles.overlayColumn}>
+          <View style={{ alignSelf: 'flex-start', marginBottom: 2 }}>
+            <SyncBadge />
+          </View>
           <View style={styles.topRow}>
             <View style={styles.coordsChip}>
               {locationPermission === 'granted' ? (

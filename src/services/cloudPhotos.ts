@@ -2,7 +2,7 @@ import { photosRepo } from '../../db/repositories/photos';
 import type { Photo } from '../../db/schema';
 import { supabase } from '@/lib/supabase';
 
-const BUCKET = 'geocam';
+export const BUCKET = 'geocam';
 
 export interface CloudPhoto {
   id: number | string;
@@ -177,6 +177,61 @@ export async function listCloudPhotos(userId: string): Promise<CloudPhoto[]> {
   );
 
   return withUrls;
+}
+
+/**
+ * C2 (Semana 9): Consulta remota paginada por cursor con búsqueda y filtrado de borrados lógicos.
+ */
+const CLOUD_PAGE_SIZE = 10;
+
+export interface CloudPhotosPage {
+  items: CloudPhoto[];
+  nextCursor: string | null;
+}
+
+export async function listCloudPhotosPage(params: {
+  userId: string;
+  cursor: string | null;
+  search: string;
+}): Promise<CloudPhotosPage> {
+  let query = supabase
+    .from('photos')
+    .select('*')
+    .eq('user_id', params.userId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(CLOUD_PAGE_SIZE);
+
+  if (params.cursor) {
+    query = query.lt('created_at', params.cursor);
+  }
+
+  const term = params.search.trim();
+  if (term) {
+    query = query.ilike('note', `%${term}%`);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw error;
+  }
+
+  const rawItems = (data ?? []) as CloudPhoto[];
+  const withUrls = await Promise.all(
+    rawItems.map(async (item) => {
+      try {
+        const url = await signedUrl(item.storage_path);
+        return { ...item, signedUrl: url };
+      } catch {
+        return item;
+      }
+    })
+  );
+
+  return {
+    items: withUrls,
+    nextCursor: rawItems.length === CLOUD_PAGE_SIZE ? rawItems[rawItems.length - 1].created_at : null,
+  };
 }
 
 /**

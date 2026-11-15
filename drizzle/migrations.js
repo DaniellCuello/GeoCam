@@ -5,6 +5,7 @@ import m0000 from './0000_photos-and-albums.sql';
 import m0001 from './0001_photo-notes-and-favorites.sql';
 import m0002 from './0002_chemical_cargill.sql';
 import m0003 from './0003_curly_beyonder.sql';
+import m0004 from './0004_clumsy_the_professor.sql';
 
   export default {
     journal,
@@ -12,7 +13,8 @@ import m0003 from './0003_curly_beyonder.sql';
       m0000,
 m0001,
 m0002,
-m0003
+m0003,
+m0004
     }
   }
   

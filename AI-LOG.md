@@ -189,3 +189,74 @@ Registro de Auditoría de IA (AI-LOG) para el desarrollo de GeoCam en la **Seman
 * **Migraciones Drizzle**: Migración `0003_curly_beyonder.sql` generada y registrada en `migrations.js`.
 * **Auditoría de Credenciales**: Ejecutado `git log --all --full-history -- .env` con resultado vacío (0 commits), confirmando que las credenciales jamás se han expuesto en el historial.
 
+---
+
+# Semana 9 — TanStack Query y Sincronización Offline-First (GeoCam Sincronizada)
+
+**Proyecto:** GeoCam sincronizada – Taller Integrador 2 (Semana 9)
+
+---
+
+## 1. Prompts utilizados
+
+**Prompt 1 — Arquitectura de Sincronización Bidireccional:** Diseñar un sistema offline-first en dos sentidos entre SQLite local (fuente de verdad) y Supabase (PostgreSQL + Storage) orquestado por TanStack Query v5. Definir el ciclo de sincronización (bajar primero, comparar conflictos con "gana el último cambio" y subir pendientes).
+
+**Prompt 2 — Migración 0004 y Persistencia de Cursor:** Crear la tabla local `sync_meta` para persistir el cursor de bajada (`lastPulledAt:${userId}`), añadir la columna `deletedAt` en la tabla `photos` para borrado lógico (C1), generar la migración con Drizzle Kit y actualizar `photosRepo` y `syncMetaRepo`.
+
+**Prompt 3 — Detección de Red y Foco:** Conectar `onlineManager` con `expo-network` y `focusManager` con `AppState` en `src/lib/queryClient.ts` para pausar consultas sin conexión y reactivarlas automáticamente al volver la red o pasar a primer plano. Configurar persistencia offline con `@tanstack/react-query-persist-client`.
+
+**Prompt 4 — Motor de Sincronización y Reto Opcional:** Implementar `src/services/sync.ts` con `pull` (descarga binaria y propagación de borrados), `push` (subida idempotente con tolerancia a fallos individuales C5), y la regla de conflicto `mergeNotesOnConflict` para fusionar notas editadas sin conexión preservando ambas versiones.
+
+**Prompt 5 — UI Reactiva y Feed Paginado:** Diseñar el componente `SyncBadge` adaptado a los tokens de diseño de GeoCam, incorporarlo en la Cámara y en la Biblioteca (con panel de estado detallado C4), y reescribir la pestaña Nube (`nube.tsx`) con `useInfiniteQuery`, cursor, infinite scroll, búsqueda con debounce (`useDebouncedValue`) y los 4 estados de UI.
+
+---
+
+## 2. Código generado vs. modificado (Semana 9)
+
+### Archivos creados o modificados en la Semana 9
+
+| Archivo | Responsabilidad |
+| --- | --- |
+| `src/lib/queryClient.ts` | Inicialización de TanStack Query `QueryClient`, escuchadores de red (`expo-network`) y foco (`AppState`), hook `useIsOnline` y persister para caché offline con AsyncStorage (C3). |
+| `src/services/sync.ts` | Motor de sincronización bidireccional: `pull` por cursor, `push` idempotente, tolerancia de fallos por foto (C5), regla `remoteWins` y fusión de notas (Reto opcional). |
+| `src/hooks/useSync.ts` | Hook de sincronización basado en `useQuery`, con reactividad local mediante `useLiveQuery` e invalidación automática con `requestSync()`. |
+| `src/hooks/useDebouncedValue.ts` | Hook de debounce para búsqueda en vivo en la nube sin saturar la red con peticiones por tecla. |
+| `src/components/SyncBadge.tsx` | Indicador visual interactivo del estado de sincronización (Al día, Sincronizando, Pendientes, Sin conexión, Error). |
+| `src/app/(tabs)/nube.tsx` | Feed remoto paginado con `useInfiniteQuery`, cursor, infinite scroll, banner offline y los 4 estados de interfaz (C2). |
+| `src/app/(tabs)/biblioteca.tsx` | Panel de estado de sincronización (C4) con balance de subidas/bajadas y botón *"Sincronizar ahora"*. |
+| `src/app/(tabs)/geocam.tsx` | Integración del indicador `SyncBadge` visible sobre la cámara sin obstruir controles de captura. |
+| `src/hooks/usePhotos.ts` | Disparo automático de `requestSync()` tras crear, editar o eliminar fotos. Borrado lógico con `softDelete`. |
+| `src/services/photoFiles.ts` | Nueva función `downloadPhotoFile` para descargar imágenes de Supabase Storage mediante URL firmada a la carpeta de documentos. |
+| `src/services/cloudPhotos.ts` | Nueva función `listCloudPhotosPage` con paginación por cursor y filtrado de fotos con borrado lógico. |
+| `db/schema.ts` | Esquema actualizado con tabla `sync_meta` y columna `deletedAt` en tabla `photos`. |
+| `drizzle/0004_clumsy_the_professor.sql` | Quinta migración de SQLite generada y registrada en `drizzle/migrations.js`. |
+| `db/repositories/syncMeta.ts` | Repositorio para almacenar y recuperar el cursor de bajada por usuario. |
+| `db/repositories/photos.ts` | Repositorio extendido con `pendingQuery`, `listPending`, `findByClientId`, `insertFromRemote`, `applyRemote`, `markSynced` y `softDelete`. |
+| `src/app/_layout.tsx` | Integración de `PersistQueryClientProvider` y `useAppFocusManager`. |
+| `supabase_semana9.sql` | Script SQL para Supabase con `server_updated_at`, trigger, índice, política de `update` y columna `deleted_at`. |
+| `tsconfig.json` | Exclusión de las carpetas de ejemplo del profesor (`geocam-sync` y `muro-tanstack`) para aislar la compilación del proyecto principal. |
+
+---
+
+## 3. Alucinaciones y Errores Detectados y Corregidos (Semana 9)
+
+| La IA genera / Error detectado | Problema | Corrección aplicada | Cómo se verificó |
+| --- | --- | --- | --- |
+| `useQuery(['sync'], syncAll)` | Sintaxis de TanStack Query v3/v4; la v5 requiere obligatoriamente la firma con objeto `{ queryKey, queryFn }`. | Se usó `useQuery({ queryKey: ['sync', userId], queryFn })`. | Compilación estricta de TypeScript. |
+| `window.addEventListener('online')` | En React Native no existe el objeto global `window` ni eventos web de red. | Se configuró `onlineManager.setEventListener` con `Network.addNetworkStateListener` de `expo-network`. | `src/lib/queryClient.ts`. |
+| Inclusión de carpetas de ejemplo en `tsconfig.json` | `tsconfig.json` compilaba las carpetas `geocam-sync` y `muro-tanstack` causando conflictos de alias `@/`. | Se añadió `"exclude": ["node_modules", "geocam-sync", "muro-tanstack"]` en `tsconfig.json`. | `npx tsc --noEmit` completó con 0 errores. |
+| Subir primero y bajar después | Si se sube primero, un cambio local obsoleto puede sobreescribir una versión remota más reciente antes de compararlas. | Se invirtió el orden estricto: primero `pull(userId)` con cursor, y luego `push(userId)`. | `src/services/sync.ts`. |
+| Borrado destructivo directo (`DELETE`) | Un `DELETE` físico inmediato en local no deja rastro para avisar a los demás dispositivos que la foto fue eliminada. | Se implementó borrado lógico con `deletedAt` en SQLite y `deleted_at` en Supabase (C1). | Flujo de borrado sincronizado probado. |
+| Falla en lote por foto huérfana | Si una foto fallaba al subir (archivo ausente), el ciclo completo se interrumpía dejando las demás pendientes. | Se envolvió cada foto en un `try/catch` individual dentro de `push(userId)` (C5). | `src/services/sync.ts`. |
+| `StyleSheet.absoluteFillObject` | Propiedad inexistente en el tipo estricto de StyleSheet en React Native. | Se corrigió por `StyleSheet.absoluteFill`. | TypeScript `0 errores`. |
+
+---
+
+## 4. Verificación de la Semana 9
+
+* **TypeScript**: `npx tsc --noEmit` verificado con `0 errores`.
+* **ESLint**: `npx eslint src db` verificado con `0 errores` y `0 advertencias`.
+* **Migraciones Drizzle**: Migración `0004_clumsy_the_professor.sql` generada y registrada en `migrations.js`.
+* **Persistencia Offline**: `@tanstack/react-query-persist-client` con AsyncStorage configurado en el layout raíz.
+
+

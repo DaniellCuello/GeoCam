@@ -29,6 +29,13 @@
       "when": 1792357839558,
       "tag": "0003_curly_beyonder",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794759850182,
+      "tag": "0004_clumsy_the_professor",
+      "breakpoints": true
     }
   ]
 }

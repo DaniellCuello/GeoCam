@@ -475,6 +475,150 @@ create policy "borrar de mi carpeta" on storage.objects
 
 ---
 
+## Semana 9 — TanStack Query y Sincronización Offline-First
+
+### Objetivo
+
+Unir la persistencia local de la **Semana 7** (SQLite + Drizzle) con la nube de la **Semana 8** (Supabase):
+la aplicación trabaja normalmente sin conexión a internet y, al recuperar la red o volver a primer plano, sube automáticamente lo pendiente y descarga lo nuevo hasta quedar 100% sincronizada. **TanStack Query** es el motor que ejecuta, reintenta y dispara la sincronización.
+
+---
+
+### Diagrama del Ciclo de Sincronización Bidireccional
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                        CICLO DE SINCRONIZACIÓN                         │
+│                                                                        │
+│   1. BAJAR (PULL)                                                      │
+│      Pedir a Supabase filas con server_updated_at > cursor local       │
+│      ├── Foto no existe en local    → Descarga binaria + Insert SQLite │
+│      ├── Versión remota más nueva   → Actualiza local (remoteWins)     │
+│      ├── Foto con deleted_at remoto → Borra archivo local + softDelete │
+│      └── Versión local más nueva    → No se toca (se sube en paso 2)   │
+│      Avanza cursor lastPulledAt:${userId} fila por fila                │
+│                                                                        │
+│   2. SUBIR (PUSH)                                                      │
+│      Enviar fotos pendientes (syncedAt nulo o < updatedAt)             │
+│      ├── Foto con deletedAt local   → Elimina en Storage + upsert mark │
+│      ├── Archivo nuevo              → Sube ArrayBuffer a Storage       │
+│      ├── upsert por client_id       → Idempotente: nunca duplica filas │
+│      └── Marca syncedAt = updatedAt → La versión exacta subida         │
+│      Tolerancia a fallos: Si una falla, las demás continúan (C5)       │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Novedades y Funcionalidades de la Semana 9
+
+1. **Backend y Cursor de Servidor (`supabase_semana9.sql` - Tarea T1)**:
+   - Columna `server_updated_at timestamptz not null default now()` gestionada mediante trigger en PostgreSQL para garantizar un cursor de bajada confiable independiente del reloj del cliente.
+   - Índice `photos_user_server_updated_idx` sobre `(user_id, server_updated_at)` para consultas veloces.
+   - Política RLS de `update` para permitir `upsert` seguro por `client_id`.
+
+2. **Detección de Red y Foco con TanStack Query (`src/lib/queryClient.ts` - Tarea T2)**:
+   - `onlineManager` configurado con `expo-network` para pausar consultas sin conexión y reanudarlas al instante.
+   - `useAppFocusManager` configurado con `AppState` para refrescar al volver a primer plano.
+   - Reintentos automáticos ante error con espera exponencial (`retry: 2`).
+
+3. **Soporte Local y Cursor Persistente (`db/schema.ts`, `db/repositories/syncMeta.ts` - Tarea T3)**:
+   - Tabla SQLite `sync_meta` para persistir el cursor `lastPulledAt:${userId}` entre reinicios de la aplicación.
+   - Repositorio `photosRepo` ampliado con `pendingQuery`, `listPending`, `findByClientId`, `insertFromRemote`, `applyRemote` y `markSynced`.
+
+4. **Sincronización Bidireccional Idempotente (`src/services/sync.ts` - Tareas T4 y T5)**:
+   - Bajar primero y subir después: evita que un cambio local desactualizado sobreescriba una versión remota más reciente.
+   - Subida protegida por `client_id`: repetir la sincronización no crea duplicados en PostgreSQL ni en Storage.
+   - Tolerancia a errores individuales por fotografía (**Tarea C5**).
+
+5. **Disparo Automático e Indicador Visual (`src/hooks/useSync.ts`, `src/components/SyncBadge.tsx` - Tarea T6)**:
+   - Se dispara al iniciar sesión, al recuperar la red, al volver a primer plano y tras cada cambio local (`addPhoto`, `updatePhoto`, `removePhoto`).
+   - `SyncBadge` interactivo visible en la Cámara (`geocam.tsx`) y en la Biblioteca (`biblioteca.tsx`), con estados: *Al día* (🟢), *Sincronizando…* (🔵), *N pendientes* (🟡), *Sin conexión* (🟠) y *Error* (🔴).
+
+6. **Borrados Lógicos Sincronizados (Tarea C1)**:
+   - Columna `deleted_at` en Supabase y `deletedAt` en SQLite.
+   - Eliminar una foto en cualquier teléfono marca la fecha de borrado y se propaga limpiamente a los demás dispositivos sin romper la integridad referencial.
+
+7. **Feed Paginado de la Nube con Infinite Scroll (`src/app/(tabs)/nube.tsx` - Tarea C2)**:
+   - Implementado con `useInfiniteQuery`, cursor por `created_at`, búsqueda en vivo con debounce (`useDebouncedValue`), y los 4 estados de UI (carga inicial, error con reintento, vacío y sin conexión).
+
+8. **Caché que Sobrevive al Cierre (Tarea C3)**:
+   - Persistencia de la caché de TanStack Query en almacenamiento local (`@react-native-async-storage/async-storage`) mediante `PersistQueryClientProvider`.
+
+9. **Panel de Estado de Sincronización en Biblioteca (`src/app/(tabs)/biblioteca.tsx` - Tarea C4)**:
+   - Muestra fotos pendientes, hora del último ciclo, balance de fotos subidas/bajadas y botón manual *"Sincronizar ahora"*.
+
+---
+
+### Regla de Resolución de Conflictos y Reto Opcional
+
+* **Regla base:** *"Gana el último cambio"* (`remoteWins`). La versión con `updatedAt` más reciente prevalece.
+* **Reto Opcional (Fusión de notas):**
+  Si dos dispositivos editan la nota de la misma fotografía mientras están sin conexión, en lugar de descartar la edición más antigua, la función `mergeNotesOnConflict` preserva ambos textos:
+  ```text
+  [Nota más reciente]:
+  Hermosa tarde en el mirador.
+
+  [Nota previa conservada]:
+  Atardecer despejado con viento suave.
+  ```
+  * **¿Cuándo es mejor esta regla?** En notas colaborativas, descripciones de campo o bitácoras donde perder información humana escrita es crítico.
+  * **¿Cuándo es peor?** En campos atómicos o estructurados (títulos cortos, categorías fijas) donde la concatenación genera redundancia visual.
+
+---
+
+### Matriz de Pruebas de Sincronización (Tarea C6)
+
+| # | Escenario | Resultado esperado | Resultado obtenido | Estado |
+| :-: | :--- | :--- | :--- | :-: |
+| **1** | Foto tomada sin conexión; luego se reconecta | Se sube sola; el contador de pendientes vuelve a 0 | Al desactivar modo avión, `onlineManager` reactiva la consulta y sube la foto automáticamente | ✅ Verificado |
+| **2** | Foto creada en el teléfono A | Aparece en B con imagen y ubicación en el mapa | El paso `pull` detecta el nuevo `server_updated_at`, descarga la imagen a documentos y crea la fila local | ✅ Verificado |
+| **3** | Nota editada en A y después en B, ambos sin conexión | En los dos queda la nota de B (o ambas fusionadas) | Al reconectar ambos, la versión con `updatedAt` más reciente de B prevalece preservando la nota | ✅ Verificado |
+| **4** | Foto borrada en A | Desaparece en B y del bucket | Se sube la marca `deleted_at`, B ejecuta `pull`, aplica softDelete y elimina su archivo físico | ✅ Verificado |
+| **5** | Foto editada en A y borrada después en B, ambos sin conexión | Queda borrada en los dos (el borrado es el último cambio) | Como `deletedAt` en B es posterior al `updatedAt` de A, la eliminación gana | ✅ Verificado |
+| **6** | Se corta la red a mitad de una sincronización de 5 fotos | Al reconectar termina sin duplicar filas ni archivos | El `upsert` por `client_id` y la tolerancia de archivo existente en Storage evitan duplicados | ✅ Verificado |
+| **7** | Se cierra la app con fotos pendientes y se abre con red | Se sincroniza sola al abrir | Al montar `RootLayout` y autenticar el usuario, `useSync` ejecuta `syncAll` de inmediato | ✅ Verificado |
+
+---
+
+### SQL de Actualización de la Semana 9 (`supabase_semana9.sql`)
+
+```sql
+-- 1. Reloj del servidor: cuándo llegó cada cambio a Supabase (cursor de bajada)
+alter table public.photos
+  add column if not exists server_updated_at timestamptz not null default now();
+
+create or replace function public.touch_server_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.server_updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger photos_touch_server_updated_at
+  before insert or update on public.photos
+  for each row execute function public.touch_server_updated_at();
+
+create index if not exists photos_user_server_updated_idx
+  on public.photos (user_id, server_updated_at);
+
+-- 2. Política RLS de actualización para permitir upsert
+create policy "editar las mías" on public.photos
+  for update to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+
+-- 3. Borrado lógico sincronizado (C1)
+alter table public.photos
+  add column if not exists deleted_at timestamptz;
+
+create index if not exists photos_user_deleted_idx
+  on public.photos (user_id, deleted_at);
+```
+
+---
+
 ## Ejecutar el proyecto
 
 ```bash

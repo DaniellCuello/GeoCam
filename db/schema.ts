@@ -42,11 +42,22 @@ export const photos = sqliteTable(
     syncedAt: integer('synced_at', { mode: 'timestamp_ms' }),
     // C5: Usuario propietario de la foto para separación local multi-usuario
     ownerId: text('owner_id'),
+
+    // Semana 9 (C1): Borrado lógico sincronizado
+    deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
   },
   (table) => [index('photos_created_at_idx').on(table.createdAt)]
 );
+
+// Semana 9 (T3): metadatos de sincronización (cursor de bajada)
+export const syncMeta = sqliteTable('sync_meta', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+});
 
 export type Album = typeof albums.$inferSelect;
 export type NewAlbum = typeof albums.$inferInsert;
 export type Photo = typeof photos.$inferSelect;
 export type NewPhoto = typeof photos.$inferInsert;
+export type SyncMeta = typeof syncMeta.$inferSelect;
+export type NewSyncMeta = typeof syncMeta.$inferInsert;

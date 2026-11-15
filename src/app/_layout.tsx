@@ -3,12 +3,14 @@ import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 
 import { ThemedText } from '@/components/themed-text';
 import { SplashOverlay } from '@/components/splash-overlay';
 import { Brand, Spacing } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { asyncStoragePersister, queryClient, useAppFocusManager } from '@/lib/queryClient';
 import { db } from '../../db/client';
 import { photosRepo } from '../../db/repositories/photos';
 import migrations from '../../drizzle/migrations';
@@ -83,12 +85,18 @@ function MigrationGate() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  useAppFocusManager();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <SplashOverlay />
-      <MigrationGate />
-    </ThemeProvider>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister: asyncStoragePersister }}
+    >
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <SplashOverlay />
+        <MigrationGate />
+      </ThemeProvider>
+    </PersistQueryClientProvider>
   );
 }
 

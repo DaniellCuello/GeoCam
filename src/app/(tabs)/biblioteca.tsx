@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
 import { GeoPhotoCard } from '@/components/GeoPhotoCard';
 import { PhotoFilters } from '@/components/PhotoFilters';
+import { SyncBadge } from '@/components/SyncBadge';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, Layout, Radii, Spacing } from '@/constants/theme';
@@ -13,6 +14,7 @@ import { Icons } from '@/constants/icons';
 import { useAuth } from '@/context/AuthContext';
 import { useAlbums } from '@/hooks/useAlbums';
 import { usePhotos } from '@/hooks/usePhotos';
+import { useSync } from '@/hooks/useSync';
 import { confirmAction } from '@/utils/confirm';
 import { toErrorMessage } from '@/utils/errors';
 import type { Photo } from '../../../db/schema';
@@ -25,43 +27,15 @@ export default function BibliotecaScreen() {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Estado de sincronización en progreso (C1)
-  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number } | null>(null);
-  const isSyncing = syncProgress !== null;
+  // C4: Estado de sincronización en tiempo real con TanStack Query
+  const { isOnline, pendingCount, isSyncing, lastResult, error: syncError, syncNow } = useSync();
 
-  const { photos, removePhoto, syncPending, queryError } = usePhotos({
+  const { photos, removePhoto, queryError } = usePhotos({
     search,
     albumId,
     onlyFavorites,
   });
   const { albums, error: albumsError, createAlbum, removeAlbum } = useAlbums();
-
-  const handleSync = async () => {
-    if (isSyncing) return;
-    try {
-      setActionError(null);
-      setSyncProgress({ current: 0, total: 0 });
-
-      const result = await syncPending((current, total) => {
-        setSyncProgress({ current, total });
-      });
-
-      if (result.synced === 0 && result.failed === 0) {
-        Alert.alert('Sincronización', 'Todas las fotos ya están sincronizadas con la nube.');
-      } else {
-        Alert.alert(
-          'Sincronización finalizada',
-          `Fotos subidas: ${result.synced}${
-            result.failed > 0 ? `\nFotos pendientes o con error: ${result.failed}` : ''
-          }`
-        );
-      }
-    } catch (err) {
-      setActionError(toErrorMessage(err, 'Error durante la sincronización.'));
-    } finally {
-      setSyncProgress(null);
-    }
-  };
 
   const handleSignOut = async () => {
     const confirmed = await confirmAction({
@@ -79,7 +53,7 @@ export default function BibliotecaScreen() {
     async (id: number) => {
       const confirmed = await confirmAction({
         title: 'Eliminar fotografía',
-        message: '¿Estás seguro de que deseas eliminar esta fotografía de la biblioteca?',
+        message: '¿Deseas eliminar esta fotografía? El cambio se sincronizará automáticamente con la nube.',
         confirmLabel: 'Eliminar',
         destructive: true,
       });
@@ -134,7 +108,7 @@ export default function BibliotecaScreen() {
         ListHeaderComponent={
           <View style={styles.headerColumn}>
             <View style={styles.topRow}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <ThemedText type="title" accessibilityRole="header">
                   Biblioteca
                 </ThemedText>
@@ -145,17 +119,20 @@ export default function BibliotecaScreen() {
                 </ThemedText>
               </View>
 
-              {user ? (
-                <Pressable
-                  onPress={handleSignOut}
-                  accessibilityRole="button"
-                  style={styles.signOutBtn}
-                >
-                  <ThemedText type="small" style={styles.signOutText}>
-                    Salir
-                  </ThemedText>
-                </Pressable>
-              ) : null}
+              <View style={styles.headerRight}>
+                <SyncBadge />
+                {user ? (
+                  <Pressable
+                    onPress={handleSignOut}
+                    accessibilityRole="button"
+                    style={styles.signOutBtn}
+                  >
+                    <ThemedText type="small" style={styles.signOutText}>
+                      Salir
+                    </ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
 
             {user?.email && (
@@ -164,31 +141,50 @@ export default function BibliotecaScreen() {
               </ThemedText>
             )}
 
-            {/* C1: Botón de Sincronización con barra de progreso */}
-            <Pressable
-              onPress={handleSync}
-              disabled={isSyncing}
-              accessibilityRole="button"
-              style={[
-                styles.syncBtn,
-                { opacity: isSyncing ? 0.7 : 1 },
-              ]}
-            >
-              {isSyncing ? (
-                <View style={styles.syncRow}>
-                  <ActivityIndicator size="small" color={Brand.onBrand} />
-                  <ThemedText style={styles.syncBtnText}>
-                    {syncProgress.total > 0
-                      ? `Sincronizando ${syncProgress.current} de ${syncProgress.total}…`
-                      : 'Verificando pendientes…'}
+            {/* C4: Tarjeta de estado de sincronización TanStack Query */}
+            <View style={styles.syncCard}>
+              <View style={styles.syncCardHeader}>
+                <View style={styles.syncHeaderLeft}>
+                  <ThemedText type="smallBold">
+                    {isOnline
+                      ? pendingCount > 0
+                        ? `☁️ ${pendingCount} pendiente(s) de sincronizar`
+                        : '🟢 Todo sincronizado con Supabase'
+                      : `🟠 Sin conexión (${pendingCount} pendiente${pendingCount === 1 ? '' : 's'})`}
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary" style={styles.syncMetaText}>
+                    {lastResult
+                      ? `Última sinc: ${new Date(lastResult.finishedAt).toLocaleTimeString()} (${lastResult.pushed} subidas, ${lastResult.pulled} bajadas)`
+                      : 'Sincronización automática activa con TanStack Query'}
                   </ThemedText>
                 </View>
-              ) : (
-                <ThemedText style={styles.syncBtnText}>
-                  ☁️ Sincronizar pendientes con Supabase
+
+                <Pressable
+                  onPress={() => void syncNow()}
+                  disabled={!isOnline || isSyncing}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sincronizar ahora"
+                  style={[
+                    styles.syncNowBtn,
+                    { opacity: !isOnline || isSyncing ? 0.6 : 1 },
+                  ]}
+                >
+                  {isSyncing ? (
+                    <ActivityIndicator size="small" color={Brand.onBrand} />
+                  ) : (
+                    <ThemedText type="smallBold" style={styles.syncNowText}>
+                      Sincronizar
+                    </ThemedText>
+                  )}
+                </Pressable>
+              </View>
+
+              {syncError ? (
+                <ThemedText type="small" style={styles.syncErrorText}>
+                  ⚠️ {toErrorMessage(syncError, 'Error al sincronizar con la nube.')}
                 </ThemedText>
-              )}
-            </Pressable>
+              ) : null}
+            </View>
 
             <PhotoFilters
               search={search}
@@ -218,21 +214,9 @@ export default function BibliotecaScreen() {
               title="No se encontraron fotografías"
               description={
                 search || albumId !== 'all' || onlyFavorites
-                  ? 'Intenta cambiar o limpiar los filtros de búsqueda.'
-                  : 'Toma fotos con la cámara o súbelas desde la galería para verlas aquí.'
+                  ? 'Prueba a cambiar o limpiar los filtros de búsqueda.'
+                  : 'Toma fotos desde la cámara o importa desde tu galería para empezar.'
               }
-              actionLabel={
-                search || albumId !== 'all' || onlyFavorites ? 'Limpiar filtros' : 'Abrir Cámara'
-              }
-              onAction={() => {
-                if (search || albumId !== 'all' || onlyFavorites) {
-                  setSearch('');
-                  setAlbumId('all');
-                  setOnlyFavorites(false);
-                } else {
-                  router.push('/geocam');
-                }
-              }}
             />
           </View>
         }
@@ -254,59 +238,85 @@ const styles = StyleSheet.create({
   },
   headerColumn: {
     gap: Spacing.two,
-    marginBottom: Spacing.three,
+    marginBottom: Spacing.two,
   },
   topRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: Spacing.two,
   },
-  signOutBtn: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: Radii.pill,
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-  },
-  signOutText: {
-    color: '#B91C1C',
-    fontWeight: '600',
-  },
-  userEmail: {
-    fontSize: 12,
-    color: Brand.primary,
-  },
-  syncBtn: {
-    backgroundColor: Brand.primary,
-    borderRadius: Radii.md,
-    minHeight: Layout.minTouch,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.four,
-    marginTop: Spacing.one,
-  },
-  syncRow: {
+  headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
   },
-  syncBtnText: {
-    color: Brand.onBrand,
-    fontWeight: '700',
-    fontSize: 14,
+  userEmail: {
+    fontSize: 12,
+    opacity: 0.8,
   },
-  emptyWrap: {
-    paddingVertical: Spacing.seven,
+  signOutBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: Radii.pill,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  signOutText: {
+    color: Brand.danger,
+    fontWeight: '600',
+  },
+  syncCard: {
+    backgroundColor: 'rgba(32, 138, 239, 0.08)',
+    borderColor: 'rgba(32, 138, 239, 0.25)',
+    borderWidth: 1,
+    borderRadius: Radii.lg,
+    padding: Spacing.two,
+    gap: Spacing.one,
+  },
+  syncCardHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  syncHeaderLeft: {
+    flex: 1,
+    gap: 2,
+  },
+  syncMetaText: {
+    fontSize: 11,
+  },
+  syncNowBtn: {
+    backgroundColor: Brand.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: Radii.pill,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 36,
+  },
+  syncNowText: {
+    color: Brand.onBrand,
+    fontSize: 12,
+  },
+  syncErrorText: {
+    color: Brand.danger,
+    fontSize: 11,
+    marginTop: 4,
   },
   errorCard: {
-    padding: Spacing.three,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: Brand.danger,
+    borderWidth: 1,
     borderRadius: Radii.md,
-    backgroundColor: Brand.dangerSoft,
-    marginTop: Spacing.two,
+    padding: Spacing.two,
   },
   errorText: {
     color: Brand.danger,
+  },
+  emptyWrap: {
+    paddingTop: Spacing.four,
   },
 });

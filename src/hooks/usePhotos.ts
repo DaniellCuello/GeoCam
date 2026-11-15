@@ -2,7 +2,7 @@ import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useCallback } from 'react';
 
 import { useAuth } from '@/context/AuthContext';
-import { deleteCloudPhoto, syncPendingPhotos } from '@/services/cloudPhotos';
+import { requestSync } from '@/hooks/useSync';
 import { deletePhotoFile, persistPhoto } from '@/services/photoFiles';
 import * as photoRepository from '../../db/repositories/photos';
 import type { AlbumFilter, PhotoFilters } from '../../db/repositories/photos';
@@ -30,7 +30,7 @@ export function usePhotoActions() {
       const persistentUri = await persistPhoto(input.uri);
 
       try {
-        return await photoRepository.create({
+        const created = await photoRepository.create({
           uri: persistentUri,
           source: input.source,
           latitude: input.coords?.latitude ?? null,
@@ -39,6 +39,11 @@ export function usePhotoActions() {
           albumId: input.albumId ?? null,
           ownerId: user?.id ?? null,
         });
+
+        // Semana 9: Dispara la sincronización automática tras cada cambio local
+        requestSync();
+
+        return created;
       } catch (cause) {
         try {
           deletePhotoFile(persistentUri);
@@ -58,61 +63,32 @@ export function usePhotoActions() {
 
   const removePhoto = useCallback(
     async (id: number): Promise<void> => {
-      // 1. Obtener datos de la foto antes de borrarla
-      const existing = (await photoRepository.byIdQuery(id))[0];
-
-      // 2. Si está sincronizada en la nube, borrarla coherentemente en Supabase (C3)
-      if (existing && existing.remotePath && user?.id) {
-        try {
-          await deleteCloudPhoto(existing, user.id);
-        } catch (cloudErr) {
-          throw new Error(
-            `No se pudo eliminar de la nube (verifica tu conexión): ${
-              cloudErr instanceof Error ? cloudErr.message : String(cloudErr)
-            }`
-          );
-        }
-      }
-
-      // 3. Eliminar de SQLite local
-      const removed = await photoRepository.remove(id);
-
-      if (removed) {
-        deletePhotoFile(removed.uri);
-      }
+      // C1: Borrado lógico sincronizado. Se marca en SQLite y se pide sincronizar para
+      // propagar la eliminación a Supabase y al resto de dispositivos del usuario.
+      await photoRepository.softDelete(id);
+      requestSync();
     },
-    [user]
-  );
-
-  const clearAll = useCallback(async (): Promise<void> => {
-    const removed = await photoRepository.clearAll(user?.id ?? null);
-    const cleanup = await Promise.allSettled(removed.map((photo) => deletePhotoFile(photo.uri)));
-    const failures = cleanup.filter((result) => result.status === 'rejected');
-
-    if (failures.length > 0) {
-      throw new Error(
-        `Se borraron los registros, pero no se pudieron eliminar ${failures.length} archivo(s) de fotografía.`
-      );
-    }
-  }, [user]);
-
-  const updatePhoto = useCallback(
-    (id: number, values: Partial<Pick<Photo, 'note' | 'favorite' | 'albumId'>>) =>
-      photoRepository.update(id, values),
     []
   );
 
-  const syncPending = useCallback(
-    async (onProgress?: (current: number, total: number) => void) => {
-      if (!user?.id) {
-        throw new Error('Debes iniciar sesión para sincronizar fotos.');
-      }
-      return syncPendingPhotos(user.id, onProgress);
+  const clearAll = useCallback(async (): Promise<void> => {
+    const list = await photoRepository.listPending(user?.id ?? null);
+    for (const p of list) {
+      await photoRepository.softDelete(p.id);
+    }
+    requestSync();
+  }, [user]);
+
+  const updatePhoto = useCallback(
+    async (id: number, values: Partial<Pick<Photo, 'note' | 'favorite' | 'albumId'>>) => {
+      const updated = await photoRepository.update(id, values);
+      requestSync();
+      return updated;
     },
-    [user]
+    []
   );
 
-  return { addPhoto, removePhoto, clearAll, updatePhoto, syncPending };
+  return { addPhoto, removePhoto, clearAll, updatePhoto };
 }
 
 export function usePhotos(filters: UsePhotosFilters = {}) {
