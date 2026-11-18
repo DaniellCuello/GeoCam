@@ -641,4 +641,4 @@ npx expo start -c
 
 - El mapa no se renderiza en **web**: `react-native-maps` llega hasta `codegenNativeComponent`, que `react-native-web` no exporta. Por eso la versión web es un archivo aparte (`mapa.web.tsx`).
 - Las fotos de la galería se etiquetan con la ubicación **actual**, porque `expo-image-picker` no expone los EXIF de la imagen.
-- La base de datos y las fotos son locales al dispositivo; desinstalar la app o cambiar de teléfono no sincroniza fotos a la nube.
+- Desde la **Semana 8 y Semana 9**, las fotos se respaldan y sincronizan automáticamente con Supabase (PostgreSQL + Storage) y TanStack Query cuando hay conexión; desinstalar la app ya no ocasiona pérdida de datos si la cuenta inició sesión.
