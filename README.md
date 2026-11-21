@@ -619,6 +619,12 @@ create index if not exists photos_user_deleted_idx
 
 ---
 
+### Actualización a Expo SDK 58 (Compatibilidad con Expo Go 58)
+
+El proyecto se encuentra actualizado a **Expo SDK 58** (`58.0.26`) con `@expo/cli` (`58.1.21`), `react@19.3.0` y `react-native@0.88.1`. Todas las dependencias nativas (`expo-camera`, `expo-sqlite`, `expo-location`, `expo-router`, `react-native-maps`, etc.) están alineadas para operar con la aplicación móvil **Expo Go 58**.
+
+---
+
 ## Ejecutar el proyecto
 
 ```bash
@@ -630,8 +636,8 @@ npx expo start -c
 
 | Escenario | ¿Funciona? | Comando |
 | --- | --- | --- |
-| **Expo Go** | **No.** `expo-camera`, `expo-location`, `expo-sensors`, `expo-sqlite` y `react-native-maps` requieren un development build. | — |
-| **Development build** | Sí. Para probar cámara, GPS, shake, mapa y SQLite. | `npx expo run:android` · `npx expo run:ios` · o `eas build --profile development` |
+| **Expo Go 58** | Sí (o mediante Development build para módulos nativos con configuración personalizada). | `npx expo start -c` |
+| **Development build** | Sí. Para probar cámara, GPS, shake, mapa y SQLite con binarios nativos completos. | `npx expo run:android` · `npx expo run:ios` · o `eas build --profile development` |
 | **Producción** | Sí, declarando `androidGoogleMapsApiKey` si publicas en Android. | `eas build --profile production` |
 | **Web** | Parcial: navegan Inicio, Biblioteca, Mapa y Detalle, almacenando imágenes como data URI en SQLite del navegador. | `npx expo start --web` |
 

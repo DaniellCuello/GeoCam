@@ -337,7 +337,7 @@ export default function NubeScreen() {
                 Cargando más fotos…
               </ThemedText>
             </View>
-          ) : null
+          ) : undefined
         }
       />
     </ThemedView>

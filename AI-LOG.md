@@ -249,11 +249,14 @@ Registro de Auditoría de IA (AI-LOG) para el desarrollo de GeoCam en la **Seman
 | Borrado destructivo directo (`DELETE`) | Un `DELETE` físico inmediato en local no deja rastro para avisar a los demás dispositivos que la foto fue eliminada. | Se implementó borrado lógico con `deletedAt` en SQLite y `deleted_at` en Supabase (C1). | Flujo de borrado sincronizado probado. |
 | Falla en lote por foto huérfana | Si una foto fallaba al subir (archivo ausente), el ciclo completo se interrumpía dejando las demás pendientes. | Se envolvió cada foto en un `try/catch` individual dentro de `push(userId)` (C5). | `src/services/sync.ts`. |
 | `StyleSheet.absoluteFillObject` | Propiedad inexistente en el tipo estricto de StyleSheet en React Native. | Se corrigió por `StyleSheet.absoluteFill`. | TypeScript `0 errores`. |
+| `"expo" no se reconoce como un comando interno o externo` | Faltaban los ejecutables binarios `.bin/expo.cmd` tras una instalación interrumpida y desalineación con Expo Go 58. | Se instaló `expo@~58.0.26`, se regeneraron los binarios en `node_modules/.bin` y se alinearon las 34 dependencias a Expo SDK 58. | `npx expo --version` devolvió `58.1.21`. |
+| Incompatibilidad de tipos en React 19.3 / RN 0.88 (`react-native-safe-area-context`) | El paquete `react-native-safe-area-context` en SDK 58 no exportaba declaraciones completas en su índice DTS. | Se creó `src/types/react-native-safe-area-context.d.ts` y se actualizaron los tipos en `useTheme`, `app-tabs` y `nube.tsx`. | `npx tsc --noEmit` completó con 0 errores. |
 
 ---
 
-## 4. Verificación de la Semana 9
+## 4. Verificación de la Semana 9 y Actualización a Expo 58
 
+* **Expo SDK**: Actualizado a **Expo SDK 58** (`58.0.26`) y `@expo/cli` (`58.1.21`), plenamente compatible con **Expo Go 58**.
 * **TypeScript**: `npx tsc --noEmit` verificado con `0 errores`.
 * **ESLint**: `npx eslint src db` verificado con `0 errores` y `0 advertencias`.
 * **Migraciones Drizzle**: Migración `0004_clumsy_the_professor.sql` generada y registrada en `migrations.js`.

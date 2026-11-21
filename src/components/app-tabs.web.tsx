@@ -38,7 +38,7 @@ type SectionTabProps = TabTriggerSlotProps & {
 function SectionTab({ icon, label, showLabel, isFocused, ...props }: SectionTabProps) {
   return (
     <Pressable
-      {...props}
+      {...(props as any)}
       accessibilityRole="tab"
       accessibilityState={{ selected: Boolean(isFocused) }}
       accessibilityLabel={label}
