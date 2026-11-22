@@ -5,4 +5,18 @@ const config = getDefaultConfig(__dirname);
 
 config.resolver.sourceExts.push('sql');
 
+const defaultResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === 'react-native-safe-area-context') {
+    return {
+      filePath: require.resolve('react-native-safe-area-context/lib/module/index.js'),
+      type: 'sourceFile',
+    };
+  }
+  if (defaultResolveRequest) {
+    return defaultResolveRequest(context, moduleName, platform);
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 module.exports = config;
