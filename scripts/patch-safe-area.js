@@ -32,4 +32,22 @@ for (const { path: relPath, content } of filesToPatch) {
     fs.writeFileSync(fullPath, content);
   } catch (e) {}
 }
-console.log('react-native-safe-area-context patched successfully.');
+
+// Restore any material-symbols fonts if npm left them in staging folders
+try {
+  const fontsParent = path.resolve(__dirname, '..', 'node_modules', '@expo-google-fonts');
+  if (fs.existsSync(fontsParent)) {
+    const entries = fs.readdirSync(fontsParent);
+    const targetDir = path.join(fontsParent, 'material-symbols');
+    for (const entry of entries) {
+      if (entry.startsWith('.material-symbols-')) {
+        const stagingDir = path.join(fontsParent, entry);
+        if (fs.existsSync(stagingDir) && fs.existsSync(targetDir)) {
+          fs.cpSync(stagingDir, targetDir, { recursive: true, force: false });
+        }
+      }
+    }
+  }
+} catch (e) {}
+
+console.log('Postinstall patches applied successfully.');
