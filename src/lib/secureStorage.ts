@@ -5,21 +5,44 @@ const CHUNK_SIZE = 1000;
 const countKey = (key: string) => `${key}.chunks`;
 const chunkKey = (key: string, i: number) => `${key}.${i}`;
 
+const memoryStore = new Map<string, string>();
+
+function getStorage(): Storage | null {
+  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+    return window.localStorage;
+  }
+  return null;
+}
+
 async function readCount(key: string): Promise<number> {
   if (Platform.OS === 'web') {
-    return Number(localStorage.getItem(countKey(key)) ?? 0);
+    const storage = getStorage();
+    if (!storage) {
+      return Number(memoryStore.get(countKey(key)) ?? 0);
+    }
+    return Number(storage.getItem(countKey(key)) ?? 0);
   }
   return Number((await SecureStore.getItemAsync(countKey(key))) ?? 0);
 }
 
 async function removeItem(key: string): Promise<void> {
   if (Platform.OS === 'web') {
+    const storage = getStorage();
     const count = await readCount(key);
     for (let i = 0; i < count; i++) {
-      localStorage.removeItem(chunkKey(key, i));
+      if (storage) {
+        storage.removeItem(chunkKey(key, i));
+      } else {
+        memoryStore.delete(chunkKey(key, i));
+      }
     }
-    localStorage.removeItem(countKey(key));
-    localStorage.removeItem(key);
+    if (storage) {
+      storage.removeItem(countKey(key));
+      storage.removeItem(key);
+    } else {
+      memoryStore.delete(countKey(key));
+      memoryStore.delete(key);
+    }
     return;
   }
 
@@ -34,13 +57,19 @@ async function removeItem(key: string): Promise<void> {
 export const secureStorage = {
   async getItem(key: string): Promise<string | null> {
     if (Platform.OS === 'web') {
+      const storage = getStorage();
       const count = await readCount(key);
       if (count === 0) {
-        return localStorage.getItem(key) ?? null;
+        if (storage) {
+          return storage.getItem(key) ?? null;
+        }
+        return memoryStore.get(key) ?? null;
       }
       let value = '';
       for (let i = 0; i < count; i++) {
-        const chunk = localStorage.getItem(chunkKey(key, i));
+        const chunk = storage
+          ? storage.getItem(chunkKey(key, i))
+          : (memoryStore.get(chunkKey(key, i)) ?? null);
         if (chunk === null) return null;
         value += chunk;
       }
@@ -67,14 +96,21 @@ export const secureStorage = {
     await removeItem(key);
 
     if (Platform.OS === 'web') {
+      const storage = getStorage();
       const total = Math.ceil(value.length / CHUNK_SIZE);
       for (let i = 0; i < total; i++) {
-        localStorage.setItem(
-          chunkKey(key, i),
-          value.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
-        );
+        const part = value.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+        if (storage) {
+          storage.setItem(chunkKey(key, i), part);
+        } else {
+          memoryStore.set(chunkKey(key, i), part);
+        }
       }
-      localStorage.setItem(countKey(key), String(total));
+      if (storage) {
+        storage.setItem(countKey(key), String(total));
+      } else {
+        memoryStore.set(countKey(key), String(total));
+      }
       return;
     }
 
@@ -90,4 +126,3 @@ export const secureStorage = {
 
   removeItem,
 };
-
