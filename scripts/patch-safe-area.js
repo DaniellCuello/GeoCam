@@ -21,6 +21,10 @@ const filesToPatch = [
   {
     path: 'node_modules/react-native-safe-area-context/src/index.tsx',
     content: "export * from '../lib/module/index';\n"
+  },
+  {
+    path: 'node_modules/expo-asset/build/ExpoAsset.js',
+    content: "import { requireOptionalNativeModule } from 'expo-modules-core';\nconst AssetModule = typeof requireOptionalNativeModule === 'function' ? requireOptionalNativeModule('ExpoAsset') : null;\nexport async function downloadAsync(url, md5Hash, type) {\n  if (AssetModule && AssetModule.downloadAsync) {\n    return AssetModule.downloadAsync(url, md5Hash, type);\n  }\n  return url;\n}\n"
   }
 ];
 
