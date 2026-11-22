@@ -33,6 +33,30 @@ for (const { path: relPath, content } of filesToPatch) {
   } catch (e) {}
 }
 
+// Neutralize NO_INSETS_ERROR throwing in SafeAreaContext so SSR in Web never crashes
+const safeAreaContextFiles = [
+  'node_modules/react-native-safe-area-context/lib/module/SafeAreaContext.js',
+  'node_modules/react-native-safe-area-context/lib/commonjs/SafeAreaContext.js'
+];
+
+for (const relPath of safeAreaContextFiles) {
+  const fullPath = path.resolve(__dirname, '..', relPath);
+  try {
+    if (fs.existsSync(fullPath)) {
+      let content = fs.readFileSync(fullPath, 'utf8');
+      content = content.replace(
+        /if\s*\(\s*insets\s*==\s*null\s*\)\s*\{\s*throw new Error\(NO_INSETS_ERROR\);\s*\}/g,
+        'if (insets == null) { return { top: 0, bottom: 0, left: 0, right: 0 }; }'
+      );
+      content = content.replace(
+        /if\s*\(\s*frame\s*==\s*null\s*\)\s*\{\s*throw new Error\(NO_INSETS_ERROR\);\s*\}/g,
+        'if (frame == null) { return { x: 0, y: 0, width: 390, height: 844 }; }'
+      );
+      fs.writeFileSync(fullPath, content, 'utf8');
+    }
+  } catch (e) {}
+}
+
 // Restore any material-symbols fonts if npm left them in staging folders
 try {
   const fontsParent = path.resolve(__dirname, '..', 'node_modules', '@expo-google-fonts');

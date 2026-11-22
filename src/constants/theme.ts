@@ -13,18 +13,18 @@ import { Platform } from 'react-native';
 /** Colores semánticos que cambian con el tema claro/oscuro del sistema. */
 export const Colors = {
   light: {
-    text: '#0B1220',
-    background: '#F4F7FC',
-    backgroundElement: '#FFFFFF',
-    backgroundSelected: '#E3EFFC',
-    textSecondary: '#5B6678',
+    text: '#09090B',
+    background: '#FFFFFF',
+    backgroundElement: '#F4F4F5',
+    backgroundSelected: '#FEE2E2',
+    textSecondary: '#71717A',
   },
   dark: {
-    text: '#F2F5FA',
-    background: '#0A0D12',
-    backgroundElement: '#181D25',
-    backgroundSelected: '#22303F',
-    textSecondary: '#A6B1C0',
+    text: '#FFFFFF',
+    background: '#09090B',
+    backgroundElement: '#18181B',
+    backgroundSelected: '#27272A',
+    textSecondary: '#A1A1AA',
   },
 } as const;
 
@@ -37,55 +37,48 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
  */
 export const Surfaces = {
   light: {
-    border: '#E1E7F1',
-    shadow: '0px 8px 24px rgba(11, 18, 32, 0.08)',
-    shadowStrong: '0px 16px 40px rgba(11, 18, 32, 0.16)',
+    border: '#E4E4E7',
+    shadow: '0px 4px 16px rgba(0, 0, 0, 0.06)',
+    shadowStrong: '0px 10px 30px rgba(0, 0, 0, 0.10)',
   },
   dark: {
-    border: '#2A323E',
-    shadow: '0px 8px 24px rgba(0, 0, 0, 0.45)',
-    shadowStrong: '0px 16px 40px rgba(0, 0, 0, 0.6)',
+    border: '#27272A',
+    shadow: '0px 4px 16px rgba(0, 0, 0, 0.5)',
+    shadowStrong: '0px 10px 30px rgba(0, 0, 0, 0.8)',
   },
 } as const;
 
-/** Colores de identidad: no dependen del tema, son de la marca. */
+/** Colores de identidad: Negro principal, Secundario Rojo GeoCam. */
 export const Brand = {
-  /** Azul GeoCam. Es también el color de fondo del splash. */
-  primary: '#208AEF',
-  primaryLight: '#4AA8FF',
-  primaryDeep: '#0B62B4',
-  primarySoft: '#E3EFFC',
-  /** Verde azulado de la sección de mapa. */
-  map: '#0FA697',
-  mapSoft: '#E0F4F1',
-  danger: '#E5484D',
-  dangerSoft: '#FDECED',
-  /** Blanco de la marca, usado sobre el azul del logo y los chips oscuros. */
+  /** Rojo GeoCam. Color principal de acento y marca. */
+  primary: '#EF4444',
+  primaryLight: '#F87171',
+  primaryDeep: '#DC2626',
+  primarySoft: 'rgba(239, 68, 68, 0.15)',
+  /** Sección de mapa. */
+  map: '#EF4444',
+  mapSoft: 'rgba(239, 68, 68, 0.15)',
+  danger: '#DC2626',
+  dangerSoft: '#FEF2F2',
+  /** Blanco de la marca. */
   onBrand: '#FFFFFF',
   /** Tonos de texto sobre el velo oscuro de cámara y mapa. */
   onDark: '#FFFFFF',
-  onDarkMuted: '#C2CAD5',
+  onDarkMuted: '#A1A1AA',
   /** Velo translúcido para elementos que flotan sobre la cámara o el mapa. */
-  scrim: 'rgba(9, 13, 20, 0.62)',
+  scrim: 'rgba(0, 0, 0, 0.75)',
 } as const;
 
 /**
  * Superficies sobre el fondo oscuro de Inicio.
- *
- * A diferencia de `Colors` y `Surfaces`, estos valores **no dependen del tema**
- * del sistema: la pantalla de inicio es siempre oscura, con el mapa topográfico
- * detrás, así que sus tarjetas son cristal oscuro y no blanco o gris.
  */
 export const Night = {
-  /** Negro del fondo, apenas azulado para que no sea un plano muerto. */
-  backdrop: '#05070B',
-  /** Cristal de las tarjetas: deja ver el relieve por detrás sin perder texto. */
-  fill: 'rgba(9, 13, 20, 0.72)',
-  fillStrong: 'rgba(9, 13, 20, 0.88)',
-  border: 'rgba(255, 255, 255, 0.14)',
-  /** Curvas de nivel: dos intensidades para que el relieve tenga jerarquía. */
-  contour: 'rgba(255, 255, 255, 0.11)',
-  contourAccent: 'rgba(120, 190, 255, 0.16)',
+  backdrop: '#09090B',
+  fill: 'rgba(24, 24, 27, 0.80)',
+  fillStrong: 'rgba(24, 24, 27, 0.95)',
+  border: 'rgba(255, 255, 255, 0.12)',
+  contour: 'rgba(255, 255, 255, 0.20)',
+  contourAccent: 'rgba(239, 68, 68, 0.35)',
 } as const;
 
 export const Fonts = Platform.select({

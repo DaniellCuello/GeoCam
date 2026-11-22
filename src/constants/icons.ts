@@ -36,4 +36,6 @@ export const Icons = {
   search: { ios: 'magnifyingglass', android: 'search', web: 'search' },
   close: { ios: 'xmark', android: 'close', web: 'close' },
   cloud: { ios: 'icloud.fill', android: 'cloud', web: 'cloud' },
+  sun: { ios: 'sun.max.fill', android: 'light_mode', web: 'light_mode' },
+  moon: { ios: 'moon.fill', android: 'dark_mode', web: 'dark_mode' },
 } as const satisfies Record<string, AppIcon>;

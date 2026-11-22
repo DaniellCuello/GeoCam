@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import React from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,8 +8,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GeoCamLogo } from '@/components/GeoCamLogo';
 import { ThemedText } from '@/components/themed-text';
 import { TopographicBackdrop } from '@/components/TopographicBackdrop';
-import { Brand, Layout, Night, Radii, Spacing } from '@/constants/theme';
+import { ThemeToggleButton } from '@/components/ThemeToggleButton';
+import { Brand, Colors, Layout, Night, Radii, Spacing } from '@/constants/theme';
 import { Icons, type AppIcon } from '@/constants/icons';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePhotos } from '@/hooks/usePhotos';
 
 type ActionCardProps = {
@@ -22,10 +25,11 @@ type ActionCardProps = {
 
 /**
  * Tarjeta de acceso a una sección. Es un `Pressable` con etiqueta, rol y área
- * táctil completa, para que también funcione con lector de pantalla. El relleno
- * es cristal oscuro: deja ver el relieve del fondo sin estropear el texto.
+ * táctil completa, adaptado reactivamente al modo claro y oscuro con acento Rojo.
  */
 function ActionCard({ icon, tone, title, description, onPress, style }: ActionCardProps) {
+  const isDark = useColorScheme() === 'dark';
+
   return (
     <Pressable
       onPress={onPress}
@@ -34,93 +38,138 @@ function ActionCard({ icon, tone, title, description, onPress, style }: ActionCa
       accessibilityHint={`Abre la sección ${title}`}
       style={({ pressed }) => [
         styles.card,
-        { backgroundColor: Night.fill, borderColor: Night.border },
+        {
+          backgroundColor: isDark ? 'rgba(24, 24, 27, 0.85)' : '#FFFFFF',
+          borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#E4E4E7',
+        },
         style,
         pressed && styles.pressed,
-      ]}>
-      <View style={[styles.cardIcon, { backgroundColor: `${tone}26` }]}>
+      ]}
+    >
+      <View style={[styles.cardIcon, { backgroundColor: isDark ? `${tone}26` : `${tone}18` }]}>
         <SymbolView name={icon} size={22} tintColor={tone} style={styles.cardIconGlyph} />
       </View>
 
       <View style={styles.cardBody}>
-        <ThemedText type="cardTitle" tone="onDark">
+        <ThemedText type="cardTitle" tone={isDark ? 'onDark' : undefined}>
           {title}
         </ThemedText>
-        <ThemedText type="small" tone="onDarkMuted">
+        <ThemedText
+          type="small"
+          tone={isDark ? 'onDarkMuted' : undefined}
+          themeColor={isDark ? undefined : 'textSecondary'}
+        >
           {description}
         </ThemedText>
       </View>
 
-      <SymbolView name={Icons.chevron} size={18} tintColor={Brand.onDarkMuted} />
+      <SymbolView
+        name={Icons.chevron}
+        size={18}
+        tintColor={isDark ? Brand.onDarkMuted : '#71717A'}
+      />
     </Pressable>
   );
 }
 
 /**
  * Pantalla de inicio de GeoCam.
- *
- * Solo presenta la marca y da acceso a las dos secciones. No monta `useCamera`,
- * `useGeoLocation` ni `useShake`, así que abrirla no dispara ningún diálogo de
- * permisos: el permiso se pide dentro de la sección correspondiente.
- *
- * El fondo es negro con curvas de nivel, igual en modo claro y oscuro: por eso
- * toda la pantalla usa `Night` y `tone="onDark"` en vez del tema del sistema.
+ * Presenta el logo de punto de ubicación con cámara en color Rojo,
+ * el fondo de camuflaje topográfico de alta definición y el botón
+ * para alternar el modo oscuro en la esquina superior derecha.
  */
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { photos, photosWithLocation, queryError } = usePhotos();
+  const isDark = useColorScheme() === 'dark';
 
   const isWide = width >= 880;
   const locatedCount = photosWithLocation.length;
 
   return (
-    <View style={[styles.root, { backgroundColor: Night.backdrop }]}>
+    <View style={[styles.root, { backgroundColor: isDark ? Night.backdrop : Colors.light.background }]}>
       <TopographicBackdrop />
+
+      {/* Botón de alternancia de modo oscuro en la esquina superior derecha */}
+      <View style={[styles.topRightBar, { top: insets.top + Spacing.two }]}>
+        <ThemeToggleButton />
+      </View>
 
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: insets.top + (isWide ? Spacing.seven : Spacing.five),
+            paddingTop: insets.top + (isWide ? Spacing.seven : Spacing.six),
             paddingBottom: insets.bottom + Spacing.six,
             paddingHorizontal: Layout.gutter,
           },
         ]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.column}>
           <Animated.View entering={FadeIn.duration(320)} style={styles.hero}>
             <GeoCamLogo size={isWide ? 128 : 104} />
-            <ThemedText type="hero" tone="onDark" accessibilityRole="header">
+            <ThemedText
+              type="hero"
+              tone={isDark ? 'onDark' : undefined}
+              accessibilityRole="header"
+            >
               GeoCam
             </ThemedText>
-            <ThemedText type="default" tone="onDarkMuted" style={styles.tagline}>
+            <ThemedText
+              type="default"
+              tone={isDark ? 'onDarkMuted' : undefined}
+              themeColor={isDark ? undefined : 'textSecondary'}
+              style={styles.tagline}
+            >
               Fotos que llevan contigo el lugar donde ocurrieron.
             </ThemedText>
           </Animated.View>
 
           {queryError ? (
-            <ThemedText type="small" tone="onDark">
+            <ThemedText type="small" style={{ color: Brand.danger }}>
               No se pudieron cargar las fotografías: {queryError.message}
             </ThemedText>
           ) : null}
 
           {photos.length > 0 ? (
-            <View style={[styles.stats, { backgroundColor: Night.fill, borderColor: Night.border }]}>
+            <View
+              style={[
+                styles.stats,
+                {
+                  backgroundColor: isDark ? 'rgba(24, 24, 27, 0.85)' : '#FFFFFF',
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#E4E4E7',
+                },
+              ]}
+            >
               <View style={styles.stat}>
-                <ThemedText type="cardTitle" tone="onDark">
+                <ThemedText type="cardTitle" tone={isDark ? 'onDark' : undefined}>
                   {photos.length}
                 </ThemedText>
-                <ThemedText type="label" tone="onDarkMuted">
+                <ThemedText
+                  type="label"
+                  tone={isDark ? 'onDarkMuted' : undefined}
+                  themeColor={isDark ? undefined : 'textSecondary'}
+                >
                   {photos.length === 1 ? 'Foto' : 'Fotos'}
                 </ThemedText>
               </View>
-              <View style={[styles.statDivider, { backgroundColor: Night.border }]} />
+              <View
+                style={[
+                  styles.statDivider,
+                  { backgroundColor: isDark ? Night.border : '#E4E4E7' },
+                ]}
+              />
               <View style={styles.stat}>
-                <ThemedText type="cardTitle" tone="onDark">
+                <ThemedText type="cardTitle" tone={isDark ? 'onDark' : undefined}>
                   {locatedCount}
                 </ThemedText>
-                <ThemedText type="label" tone="onDarkMuted">
+                <ThemedText
+                  type="label"
+                  tone={isDark ? 'onDarkMuted' : undefined}
+                  themeColor={isDark ? undefined : 'textSecondary'}
+                >
                   Con ubicación
                 </ThemedText>
               </View>
@@ -138,7 +187,7 @@ export default function HomeScreen() {
             />
             <ActionCard
               icon={Icons.library}
-              tone={Brand.primaryLight}
+              tone={Brand.primary}
               title="Biblioteca"
               description="Revisa, busca y organiza todas tus fotos guardadas."
               onPress={() => router.push('/biblioteca')}
@@ -146,7 +195,7 @@ export default function HomeScreen() {
             />
             <ActionCard
               icon={Icons.map}
-              tone={Brand.map}
+              tone={Brand.primaryDeep}
               title="Mapa"
               description="Explora tus fotografías según el lugar donde fueron tomadas."
               onPress={() => router.push('/mapa')}
@@ -162,6 +211,11 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  topRightBar: {
+    position: 'absolute',
+    right: Layout.gutter,
+    zIndex: 100,
   },
   scrollContent: {
     flexGrow: 1,

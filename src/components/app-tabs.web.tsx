@@ -12,11 +12,13 @@ import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Icons, type AppIcon } from '@/constants/icons';
 import { Brand, Layout, Night, Radii, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { GeoCamLogo } from './GeoCamLogo';
 import { ThemedText } from './themed-text';
+import { ThemeToggleButton } from './ThemeToggleButton';
 
-/** Las únicas secciones reales de GeoCam. No hay enlaces de documentación. */
+/** Las secciones de GeoCam en la interfaz web. */
 const WEB_SECTIONS = [
   { name: 'inicio', href: '/', label: 'Inicio', icon: Icons.home },
   { name: 'camara', href: '/geocam', label: 'Cámara', icon: Icons.camera },
@@ -31,11 +33,9 @@ type SectionTabProps = TabTriggerSlotProps & {
   showLabel: boolean;
 };
 
-/**
- * La barra es siempre oscura porque la página de Inicio lo es: una barra clara
- * sobre un fondo negro rompería la continuidad en el salto entre pestañas.
- */
 function SectionTab({ icon, label, showLabel, isFocused, ...props }: SectionTabProps) {
+  const isDark = useColorScheme() === 'dark';
+
   return (
     <Pressable
       {...(props as any)}
@@ -44,20 +44,25 @@ function SectionTab({ icon, label, showLabel, isFocused, ...props }: SectionTabP
       accessibilityLabel={label}
       style={({ pressed }) => [
         styles.tab,
-        isFocused ? styles.tabActive : styles.tabIdle,
+        isFocused
+          ? (isDark ? styles.tabActiveDark : styles.tabActiveLight)
+          : styles.tabIdle,
         pressed && styles.pressed,
-      ]}>
+      ]}
+    >
       <SymbolView
         name={icon}
         size={18}
-        tintColor={isFocused ? Brand.primaryLight : Brand.onDarkMuted}
+        tintColor={isFocused ? Brand.primary : (isDark ? Brand.onDarkMuted : '#71717A')}
         style={styles.tabIcon}
       />
       {showLabel ? (
         <ThemedText
           type="smallBold"
           numberOfLines={1}
-          tone={isFocused ? 'onDark' : 'onDarkMuted'}>
+          tone={isFocused ? (isDark ? 'onDark' : undefined) : (isDark ? 'onDarkMuted' : undefined)}
+          themeColor={isFocused ? 'text' : 'textSecondary'}
+        >
           {label}
         </ThemedText>
       ) : null}
@@ -67,34 +72,42 @@ function SectionTab({ icon, label, showLabel, isFocused, ...props }: SectionTabP
 
 type WebHeaderProps = TabListProps & { showWordmark: boolean };
 
-/**
- * Barra superior de la web.
- *
- * Va en el flujo del layout (antes de `TabSlot`) y no flotando encima, así que
- * ninguna pantalla queda oculta bajo ella. En pantallas estrechas se oculta
- * primero el nombre y después las etiquetas, para no ocupar casi nada de alto.
- */
 function WebHeader({ children, style, showWordmark }: WebHeaderProps) {
+  const isDark = useColorScheme() === 'dark';
+
   return (
-    <View style={[style, styles.header, { borderBottomColor: Night.border }]}>
+    <View
+      style={[
+        style,
+        styles.header,
+        {
+          backgroundColor: isDark ? Night.backdrop : '#FFFFFF',
+          borderBottomColor: isDark ? Night.border : '#E4E4E7',
+        },
+      ]}
+    >
       <View style={styles.brand}>
-        <GeoCamLogo size={28} />
+        <GeoCamLogo size={32} />
         {showWordmark ? (
-          <ThemedText type="smallBold" numberOfLines={1} tone="onDark">
+          <ThemedText type="smallBold" numberOfLines={1} tone={isDark ? 'onDark' : undefined}>
             GeoCam
           </ThemedText>
         ) : null}
       </View>
 
       <View style={styles.nav}>{children}</View>
+
+      <View style={styles.rightAction}>
+        <ThemeToggleButton />
+      </View>
     </View>
   );
 }
 
 export default function AppTabs() {
   const { width } = useWindowDimensions();
-  const showWordmark = width >= 480;
-  const showLabel = width >= 360;
+  const showWordmark = width >= 520;
+  const showLabel = width >= 400;
 
   return (
     <Tabs>
@@ -121,25 +134,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.three,
+    gap: Spacing.two,
     width: '100%',
     maxWidth: Layout.contentMaxWidth,
     alignSelf: 'center',
     paddingHorizontal: Layout.gutter,
     paddingVertical: Spacing.two,
-    backgroundColor: Night.backdrop,
     borderBottomWidth: 1,
   },
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    marginRight: 'auto',
   },
   nav: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one,
+  },
+  rightAction: {
+    marginLeft: Spacing.one,
   },
   tab: {
     flexDirection: 'row',
@@ -150,8 +164,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     borderRadius: Radii.pill,
   },
-  tabActive: {
+  tabActiveDark: {
     backgroundColor: Night.fillStrong,
+  },
+  tabActiveLight: {
+    backgroundColor: '#F4F4F5',
   },
   tabIdle: {
     backgroundColor: 'transparent',

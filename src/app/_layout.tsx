@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { SplashOverlay } from '@/components/splash-overlay';
 import { Brand, Spacing } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ThemeProvider as AppThemeProvider, useThemeContext } from '@/context/ThemeContext';
 import { asyncStoragePersister, queryClient, useAppFocusManager } from '@/lib/queryClient';
 import { db } from '../../db/client';
 import { photosRepo } from '../../db/repositories/photos';
@@ -83,20 +83,28 @@ function MigrationGate() {
   );
 }
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+function RootContent() {
+  const { colorScheme } = useThemeContext();
   useAppFocusManager();
 
   return (
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{ persister: asyncStoragePersister }}
-    >
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <SplashOverlay />
-        <MigrationGate />
-      </ThemeProvider>
-    </PersistQueryClientProvider>
+    <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <SplashOverlay />
+      <MigrationGate />
+    </NavigationThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AppThemeProvider>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister: asyncStoragePersister }}
+      >
+        <RootContent />
+      </PersistQueryClientProvider>
+    </AppThemeProvider>
   );
 }
 
