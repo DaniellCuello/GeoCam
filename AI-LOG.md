@@ -269,4 +269,73 @@ Registro de Auditoría de IA (AI-LOG) para el desarrollo de GeoCam en la **Seman
 * **Migraciones Drizzle**: Migración `0004_clumsy_the_professor.sql` generada y registrada en `migrations.js`.
 * **Persistencia Offline**: `@tanstack/react-query-persist-client` con AsyncStorage configurado en el layout raíz.
 
+---
+
+# Semana 10 — IA Generativa Multimodal y Edge AI (GeoCam ve + Asistente IA)
+
+## 1. Prompts y Objetivos
+
+**Prompt 1 — GeoCam ve (Requisitos T1–T6):**
+Implementar la capacidad de que GeoCam describa fotografías tomadas con la cámara o seleccionadas de la galería utilizando Google Gemini detrás de una Supabase Edge Function (`describir-foto`). La función responde un JSON validado sin streaming y es llamada mediante `supabase.functions.invoke`. La descripción sugerida se presenta editable en el detalle de la fotografía (`src/app/foto/[id].tsx`), se guarda en SQLite en la columna `ai_description`, actualiza `updated_at` y viaja a Supabase en la sincronización bidireccional existente.
+
+**Prompt 2 — Asistente IA y Retos C1–C6:**
+Construir la pieza "Asistente IA" para el Taller Integrador 2 (tag `v2.0.0`) integrando:
+1. **C1 (Historial persistente):** Conversación guardada en SQLite con Drizzle (`chat_messages`); la app reanuda donde iba y cuenta con botón *"🔄 Reiniciar"*.
+2. **C2 (Instrucciones con tus datos):** Modal de perfil del estudiante (nombre, tema, nivel) enviado en el transporte y validado en el servidor con Zod (`.catch({})`).
+3. **C3 (Salida estructurada):** Generación de 3 a 5 tarjetas de repaso (pregunta y respuesta) con `Output.object` en Edge Function `tarjetas-repaso`.
+4. **C4 (Manejo de errores):** Banner sin conexión, controles deshabilitados sin red, mensajes claros para 401, 429 y botón *"Reintentar"*.
+5. **C5 (Límite por usuario):** Máximo N peticiones cada 24 horas contadas en Supabase (`uso_ia` con RLS).
+6. **C6 (Bitácora y pruebas):** Matriz de escenarios en `PRUEBAS.md` y actualización de `AI-LOG.md`.
+
+---
+
+## 2. Código generado vs. modificado (Semana 10)
+
+| Archivo | Rol en la arquitectura |
+| --- | --- |
+| `supabase/functions/describir-foto/index.ts` | Edge Function protegida con `withSupabase({ auth: 'user' })`, control de límite `uso_ia` (C5), llamada a Gemini con `generateText` de AI SDK v7 y respuesta JSON `{ descripcion }`. |
+| `supabase/functions/tutor/index.ts` | Edge Function de chat con streaming vía `streamText`, validación de perfil con Zod (C2), límite diario (C5) y streaming adaptado a Expo. |
+| `supabase/functions/tarjetas-repaso/index.ts` | Edge Function para salida estructurada con `Output.object` y esquema Zod de tarjetas de estudio activo (C3). |
+| `src/services/vision.ts` | Servicio de visión: reduce fotos a 1024 px JPEG calidad 0.7 con `expo-image-manipulator` e invoca `describir-foto` mediante `supabase.functions.invoke`. |
+| `src/lib/chatTransport.ts` | Transporte personalizado con `DefaultChatTransport`, `expo/fetch` y token de sesión de Supabase Auth para streaming. |
+| `src/polyfills.ts` | Polyfills de `structuredClone`, `TextEncoderStream` y `TextDecoderStream` para el motor Hermes en React Native. |
+| `src/types/ungap-structured-clone.d.ts` | Declaración de tipos TypeScript para el polyfill de `structuredClone`. |
+| `db/schema.ts` | Esquema SQLite extendido con columna `aiDescription` en tabla `photos` y nueva tabla `chat_messages` (C1). |
+| `drizzle/0005_light_lily_hollister.sql` | Sexta migración de Drizzle con `ALTER TABLE photos ADD ai_description text;` y `CREATE TABLE chat_messages;`. |
+| `drizzle/migrations.js` | Registro automático de la migración `m0005` para el migrador de Expo SQLite. |
+| `db/repositories/photos.ts` | Métodos `update` y `applyRemote` adaptados para `aiDescription`; nuevo método `setDescription` que actualiza `updatedAt`. |
+| `db/repositories/chatMessages.ts` | Repositorio SQLite con Drizzle para persistir, listar y limpiar el historial de mensajes del chat (C1). |
+| `src/services/sync.ts` | Sincronización bidireccional extendida con `ai_description` en ambos mapeos (push y pull). |
+| `src/hooks/usePhotos.ts` | Nuevo hook `setAiDescription` con invalidación de sincronización automática `requestSync()`. |
+| `src/app/foto/[id].tsx` | Interfaz del detalle de foto: botón *"✨ Describir con IA"* con spinner, aviso de modo sin conexión, aviso de privacidad a Gemini, input editable y botón para guardar en SQLite. |
+| `src/components/GeoPhotoCard.tsx` | Tarjeta de foto con vista previa en vivo de las primeras palabras de la descripción IA (`✨ ...`). |
+| `src/app/(tabs)/asistente.tsx` | Pantalla completa del Asistente IA con chat en streaming, fotos multimodales, modal de perfil (C2), visor interactivo de fichas de estudio (C3) y manejo de errores (C4). |
+| `src/components/app-tabs.tsx` | Pestaña nativa *"Asistente"* con icono `sparkles`. |
+| `supabase_semana10.sql` | Script SQL para Supabase con columna `ai_description` en `photos`, tabla `uso_ia` con RLS e índices. |
+| `PRUEBAS.md` | Matriz detallada de 12 escenarios de prueba reales (modo avión, límite 429, sesión 401, búsqueda AIza, etc.). |
+
+---
+
+## 3. Errores y Alucinaciones Detectados y Corregidos (Semana 10)
+
+| # | Error / Alucinación detectada | Problema | Corrección aplicada | Cómo se verificó |
+|---|---|---|---|---|
+| 1 | **Inclusión de `supabase/functions` en la compilación de Expo (`tsconfig.json`)** | Los archivos de Edge Functions en `supabase/functions/` son scripts de Deno (`npm:...`, `Deno.env`). El compilador `tsc` de Expo intentaba procesarlos y lanzaba errores `Cannot find name 'Deno'`. | Se agregó `"supabase"` al array `"exclude"` de `tsconfig.json`, aislando Deno del compilador de React Native. | `npx tsc --noEmit` completó con 0 errores. |
+| 2 | **Falta de tipado en módulo `@ungap/structured-clone`** | `src/polyfills.ts` arrojaba error TS7016 al importar el polyfill porque el paquete no incluía archivos `.d.ts`. | Se creó el archivo de declaración `src/types/ungap-structured-clone.d.ts` tipando la función global. | TypeScript resolvió el módulo sin advertencias. |
+| 3 | **Uso de variantes de texto y tokens inexistentes (`type="caption"`, `Brand.secondary`)** | La IA asumió que existía la variante `"caption"` en `ThemedText` y el color `Brand.secondary`, provocando errores TS2322 y TS2339. | Se sustituyó por `type="small"` y el color de superficie `#27272A` alineado con la paleta Negro/Blanco y Rojo de GeoCam. | Inspección de tipos en `ThemedText` y `theme.ts`. |
+| 4 | **Incompatibilidad de tipos en `nube.tsx` y `cloudPhotos.ts` tras migración** | Al agregar `aiDescription` a la entidad `Photo`, la mutación de borrado en `nube.tsx` fallaba por propiedad faltante. | Se extendió la interfaz `CloudPhoto` con `ai_description?: string \| null` y se incluyó en `deleteCloudPhoto` y `uploadPhoto`. | Tipado verificado en `nube.tsx`. |
+| 5 | **Ruta relativa errónea al importar repositorio en `asistente.tsx`** | Al encontrarse en `src/app/(tabs)/asistente.tsx` (profundidad 3), el import `../../db/repositories/chatMessages` no alcanzaba el directorio raíz. | Se corrigió la ruta a `../../../db/repositories/chatMessages`. | Resolución de módulos limpia en compilación. |
+| 6 | **Intento obsoleto de usar `generateObject` en AI SDK v7** | En versiones anteriores de Vercel AI SDK se usaba `generateObject`; en SDK v7 esta API fue reemplazada por `generateText` con `output: Output.object({ schema })`. | Se implementó la sintaxis oficial v7 en `tarjetas-repaso/index.ts` con `Output.object({ schema: tarjetasSchema })`. | Cumplimiento estricto de la guía Semana 10. |
+
+---
+
+## 4. Verificación de la Semana 10 (Tag v2.0.0)
+
+* **TypeScript**: `npx tsc --noEmit` completado con **0 errores**.
+* **Migraciones Drizzle**: Migración `0005_light_lily_hollister.sql` generada sin tocar migraciones previas.
+* **Seguridad de Claves**: `git grep "AIza" src/` arrojó **0 resultados**. `GEMINI_API_KEY` reside exclusivamente en Supabase Secrets.
+* **RLS en Supabase**: Tabla `uso_ia` con políticas select/insert restringidas a `auth.uid() = user_id`.
+* **Pruebas**: Matriz de 12 escenarios documentada y validada en `PRUEBAS.md`.
+
+
 

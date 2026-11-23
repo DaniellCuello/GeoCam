@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -11,7 +11,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useAlbums } from '@/hooks/useAlbums';
 import { usePhoto, usePhotoActions } from '@/hooks/usePhotos';
 import { useTheme } from '@/hooks/use-theme';
+import { useIsOnline } from '@/lib/queryClient';
 import { uploadPhoto } from '@/services/cloudPhotos';
+import { describePhotoWithAi } from '@/services/vision';
 import { confirmAction } from '@/utils/confirm';
 import { toErrorMessage } from '@/utils/errors';
 import { formatCoords, formatTimestamp, photoCoords } from '@/utils/geo-format';
@@ -21,15 +23,55 @@ export default function PhotoDetailScreen() {
   const photoId = Number(params.id);
   const safePhotoId = Number.isInteger(photoId) && photoId > 0 ? photoId : -1;
   const { photo, error: queryError } = usePhoto(safePhotoId);
-  const { updatePhoto, removePhoto } = usePhotoActions();
+  const { updatePhoto, setAiDescription, removePhoto } = usePhotoActions();
   const { albums, error: albumsError } = useAlbums();
   const { user } = useAuth();
+  const isOnline = useIsOnline();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const [noteDraft, setNoteDraft] = useState<{ photoId: number; value: string } | null>(null);
+  const [aiDraft, setAiDraft] = useState<{ photoId: number; value: string } | null>(null);
+  const [isDescribing, setIsDescribing] = useState(false);
+  const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const note = photo && noteDraft?.photoId === photo.id ? noteDraft.value : photo?.note ?? '';
+  const aiDescription = photo && aiDraft?.photoId === photo.id ? aiDraft.value : photo?.aiDescription ?? '';
+
+  const handleDescribeWithAi = async () => {
+    if (!photo) return;
+    if (!isOnline) {
+      setError('Sin conexión a internet: no es posible contactar a Gemini para describir la foto.');
+      return;
+    }
+
+    setIsDescribing(true);
+    setError(null);
+    setAiSuccessMessage(null);
+
+    try {
+      const descripcion = await describePhotoWithAi(photo.uri);
+      setAiDraft({ photoId: photo.id, value: descripcion });
+      setAiSuccessMessage('✨ Descripción generada con éxito. Es una sugerencia editable antes de guardarla.');
+    } catch (cause) {
+      setError(toErrorMessage(cause, 'No se pudo generar la descripción con IA.'));
+    } finally {
+      setIsDescribing(false);
+    }
+  };
+
+  const handleSaveAiDescription = async () => {
+    if (!photo) return;
+
+    try {
+      await setAiDescription(photo.id, aiDescription.trim() || null);
+      setAiDraft({ photoId: photo.id, value: aiDescription.trim() });
+      setAiSuccessMessage('Descripción guardada en SQLite y lista para sincronizar con la nube.');
+      setError(null);
+    } catch (cause) {
+      setError(toErrorMessage(cause, 'No se pudo guardar la descripción con IA.'));
+    }
+  };
 
   const handleUploadCloud = async () => {
     if (!photo) return;
@@ -127,6 +169,13 @@ export default function PhotoDetailScreen() {
             <ThemedText type="title" accessibilityRole="header">
               Fotografía
             </ThemedText>
+            {(!photo.syncedAt || (photo.updatedAt && photo.syncedAt && photo.updatedAt > photo.syncedAt)) ? (
+              <View style={styles.headerPendingBadge}>
+                <ThemedText type="small" style={styles.headerPendingText}>
+                  Pendiente
+                </ThemedText>
+              </View>
+            ) : null}
           </View>
 
           <Image source={{ uri: photo.uri }} style={styles.image} contentFit="contain" />
@@ -135,7 +184,89 @@ export default function PhotoDetailScreen() {
             {formatTimestamp(photo.createdAt)} · {photo.source === 'camera' ? 'Cámara' : 'Galería'}
           </ThemedText>
 
-          <ThemedText type="cardTitle">Nota</ThemedText>
+          {/* Sección de Descripción con IA (Requisitos T1–T6) */}
+          <View style={[styles.aiCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+            <View style={styles.aiHeaderRow}>
+              <ThemedText type="cardTitle">Descripción con IA</ThemedText>
+              {photo.aiDescription ? (
+                <View style={styles.aiBadgeActive}>
+                  <ThemedText type="small" style={styles.aiBadgeActiveText}>
+                    ✨ IA Lista
+                  </ThemedText>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Requisito T4: Botón Describir con IA con spinner; apagado cuando no hay red */}
+            <Pressable
+              onPress={() => void handleDescribeWithAi()}
+              disabled={isDescribing || !isOnline}
+              accessibilityRole="button"
+              style={[
+                styles.aiButton,
+                (!isOnline || isDescribing) && styles.buttonDisabled,
+              ]}
+            >
+              {isDescribing ? (
+                <View style={styles.buttonRow}>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ThemedText type="smallBold" style={styles.aiButtonText}>
+                    Describiendo con Gemini…
+                  </ThemedText>
+                </View>
+              ) : (
+                <ThemedText type="smallBold" style={styles.aiButtonText}>
+                  ✨ Describir con IA
+                </ThemedText>
+              )}
+            </Pressable>
+
+            {/* Aviso cuando no hay red */}
+            {!isOnline ? (
+              <ThemedText type="small" style={styles.offlineWarning}>
+                ⚠️ Sin conexión a internet. Conéctate a la red para consultar a Gemini.
+              </ThemedText>
+            ) : null}
+
+            {/* Requisito T6: Aviso de privacidad */}
+            <ThemedText type="small" themeColor="textSecondary" style={styles.privacyNotice}>
+              🔒 La foto se envía a Google Gemini para generar la descripción.
+            </ThemedText>
+
+            {/* Requisito T6: Campo editable con la sugerencia */}
+            <TextInput
+              value={aiDescription}
+              onChangeText={(value) => setAiDraft({ photoId: photo.id, value })}
+              placeholder="Presiona '✨ Describir con IA' o escribe una descripción..."
+              placeholderTextColor={theme.textSecondary}
+              accessibilityLabel="Descripción generada por IA"
+              multiline
+              maxLength={600}
+              style={[
+                styles.note,
+                { color: theme.text, backgroundColor: theme.background, borderColor: theme.border },
+              ]}
+            />
+
+            {/* Requisito T3 / T5: Guardar cambios en SQLite y marcar pendiente */}
+            <Pressable
+              onPress={() => void handleSaveAiDescription()}
+              accessibilityRole="button"
+              style={styles.saveAiButton}
+            >
+              <ThemedText type="smallBold" style={styles.saveAiButtonText}>
+                Guardar descripción
+              </ThemedText>
+            </Pressable>
+
+            {aiSuccessMessage ? (
+              <ThemedText type="small" style={styles.successMessage}>
+                {aiSuccessMessage}
+              </ThemedText>
+            ) : null}
+          </View>
+
+          <ThemedText type="cardTitle">Nota personal</ThemedText>
           <TextInput
             value={note}
             onChangeText={(value) => setNoteDraft({ photoId: photo.id, value })}
@@ -392,5 +523,85 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.three,
     padding: Spacing.five,
+  },
+  headerPendingBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+    borderWidth: 1,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 2,
+    borderRadius: Radii.pill,
+  },
+  headerPendingText: {
+    color: '#92400E',
+    fontWeight: '700',
+  },
+  aiCard: {
+    padding: Spacing.three,
+    borderRadius: Radii.md,
+    borderWidth: 1,
+    gap: Spacing.two,
+  },
+  aiHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  aiBadgeActive: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#86EFAC',
+    borderWidth: 1,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 2,
+    borderRadius: Radii.pill,
+  },
+  aiBadgeActiveText: {
+    color: '#166534',
+    fontWeight: '600',
+  },
+  aiButton: {
+    minHeight: Layout.minTouch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Brand.primary,
+    borderRadius: Radii.pill,
+    paddingHorizontal: Spacing.four,
+  },
+  aiButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  saveAiButton: {
+    minHeight: Layout.minTouch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#27272A',
+    borderRadius: Radii.pill,
+    paddingHorizontal: Spacing.four,
+  },
+  saveAiButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  privacyNotice: {
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
+  offlineWarning: {
+    color: '#D97706',
+    fontWeight: '600',
+  },
+  successMessage: {
+    color: '#16A34A',
+    fontWeight: '600',
   },
 });

@@ -2,16 +2,16 @@ import { AppState } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 import { secureStorage } from './secureStorage';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+export const SUPABASE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
 
 export function checkSupabaseConfig(): boolean {
-  return !!(url && key);
+  return !!(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
 }
 
 export const supabase = createClient(
-  url ?? 'https://placeholder.supabase.co',
-  key ?? 'placeholder-key',
+  SUPABASE_URL || 'https://placeholder.supabase.co',
+  SUPABASE_PUBLISHABLE_KEY || 'placeholder-key',
   {
     auth: {
       storage: secureStorage,

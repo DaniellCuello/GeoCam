@@ -121,6 +121,7 @@ export default function NubeScreen() {
           syncedAt: new Date(),
           ownerId: photo.user_id,
           deletedAt: null,
+          aiDescription: photo.ai_description ?? null,
         },
         user!.id
       );

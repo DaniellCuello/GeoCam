@@ -1,5 +1,5 @@
-import * as Crypto from 'expo-crypto';
 import { and, asc, desc, eq, gt, isNotNull, isNull, like, or, type SQL } from 'drizzle-orm';
+import * as Crypto from 'expo-crypto';
 
 import { db } from '../client';
 import { photos, type NewPhoto, type Photo } from '../schema';
@@ -85,7 +85,7 @@ export async function findById(id: number): Promise<Photo | null> {
 // Cada edición actualiza updatedAt para indicar que está pendiente de sincronización
 export async function update(
   id: number,
-  values: Partial<Pick<Photo, 'note' | 'favorite' | 'albumId'>>
+  values: Partial<Pick<Photo, 'note' | 'favorite' | 'albumId' | 'aiDescription'>>
 ) {
   const [photo] = await db
     .update(photos)
@@ -93,6 +93,11 @@ export async function update(
     .where(eq(photos.id, id))
     .returning();
   return photo ?? null;
+}
+
+// Semana 10 (T3/T5): Establece la descripción IA y actualiza updatedAt para sincronizar
+export async function setDescription(id: number, aiDescription: string | null): Promise<Photo | null> {
+  return update(id, { aiDescription });
 }
 
 // Marca la foto como sincronizada fijando remotePath y syncedAt
@@ -165,6 +170,7 @@ export async function applyRemote(
   changes: {
     note?: string | null;
     favorite?: boolean;
+    aiDescription?: string | null;
     updatedAt: Date;
     syncedAt: Date;
     deletedAt?: Date | null;
@@ -204,6 +210,7 @@ export const photosRepo = {
   findById,
   create,
   update,
+  setDescription,
   markSynced,
   ensureSyncFields,
   pendingQuery,

@@ -18,6 +18,7 @@ export interface RemotePhoto {
   latitude: number | null;
   longitude: number | null;
   note: string | null;
+  ai_description: string | null;
   favorite: boolean;
   source: 'camera' | 'gallery';
   taken_at: string;
@@ -123,6 +124,7 @@ async function pull(userId: string): Promise<number> {
           longitude: remote.longitude,
           accuracy: null,
           note: remote.note,
+          aiDescription: remote.ai_description,
           favorite: remote.favorite,
           source: remote.source,
           createdAt: new Date(remote.taken_at),
@@ -147,6 +149,7 @@ async function pull(userId: string): Promise<number> {
 
       await photosRepo.applyRemote(local.id, {
         note: resolvedNote,
+        aiDescription: remote.ai_description,
         favorite: remote.favorite,
         updatedAt: remoteUpdatedAt,
         syncedAt: remoteUpdatedAt,
@@ -236,6 +239,7 @@ async function push(userId: string): Promise<{ pushed: number; failed: number }>
           latitude: photo.latitude,
           longitude: photo.longitude,
           note: photo.note,
+          ai_description: photo.aiDescription,
           favorite: photo.favorite,
           source: photo.source,
           taken_at: photo.createdAt.toISOString(),

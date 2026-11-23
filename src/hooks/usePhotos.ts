@@ -80,7 +80,7 @@ export function usePhotoActions() {
   }, [user]);
 
   const updatePhoto = useCallback(
-    async (id: number, values: Partial<Pick<Photo, 'note' | 'favorite' | 'albumId'>>) => {
+    async (id: number, values: Partial<Pick<Photo, 'note' | 'favorite' | 'albumId' | 'aiDescription'>>) => {
       const updated = await photoRepository.update(id, values);
       requestSync();
       return updated;
@@ -88,7 +88,16 @@ export function usePhotoActions() {
     []
   );
 
-  return { addPhoto, removePhoto, clearAll, updatePhoto };
+  const setAiDescription = useCallback(
+    async (id: number, aiDescription: string | null) => {
+      const updated = await photoRepository.setDescription(id, aiDescription);
+      requestSync();
+      return updated;
+    },
+    []
+  );
+
+  return { addPhoto, removePhoto, clearAll, updatePhoto, setAiDescription };
 }
 
 export function usePhotos(filters: UsePhotosFilters = {}) {

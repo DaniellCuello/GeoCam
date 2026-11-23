@@ -78,7 +78,11 @@ export function GeoPhotoCard({ photo, onRemove, style }: GeoPhotoCardProps) {
         <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
           {formatTimestamp(photo.createdAt)}
         </ThemedText>
-        {photo.note ? (
+        {photo.aiDescription ? (
+          <ThemedText type="small" numberOfLines={2} style={styles.aiSnippet}>
+            ✨ {photo.aiDescription}
+          </ThemedText>
+        ) : photo.note ? (
           <ThemedText type="small" numberOfLines={2}>
             {photo.note}
           </ThemedText>
@@ -178,6 +182,11 @@ const styles = StyleSheet.create({
   },
   favorite: {
     color: Brand.primary,
+  },
+  aiSnippet: {
+    fontStyle: 'italic',
+    color: '#DC2626',
+    fontWeight: '500',
   },
   pressed: {
     opacity: 0.6,

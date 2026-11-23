@@ -12,6 +12,7 @@ export interface CloudPhoto {
   latitude: number | null;
   longitude: number | null;
   note: string | null;
+  ai_description?: string | null;
   favorite: boolean;
   source: 'camera' | 'gallery';
   taken_at: string;

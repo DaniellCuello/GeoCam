@@ -619,6 +619,80 @@ create index if not exists photos_user_deleted_idx
 
 ---
 
+## Semana 10 – IA Generativa Multimodal y Edge AI
+
+### Objetivo
+
+Integrar capacidades de Inteligencia Artificial multimodal y generativa en GeoCam mediante Supabase Edge Functions con Google Gemini (AI SDK v7) y Edge AI local:
+1. **GeoCam ve (T1–T6)**: Describir fotos con IA enviándolas optimizadas a una Edge Function, guardando la descripción en SQLite y sincronizándola bidireccionalmente con Supabase.
+2. **Asistente IA (C1–C6)**: Chat de tutoría académica interactivo con streaming, historial local persistente en SQLite, instrucciones personalizadas (Zod), generación estructurada de flashcards de estudio (`Output.object`), resiliencia offline y límite diario de uso auditado en Supabase.
+
+---
+
+### Funcionalidades Implementadas
+
+#### 1. GeoCam ve (T1–T6)
+- **Compresión y optimización en el cliente (`src/services/vision.ts`)**:
+  - `expo-image-manipulator` escala la imagen a un máximo de 1024 px manteniendo la relación de aspecto y comprime a JPEG calidad 0.7 en base64.
+- **Edge Function `describir-foto` (`supabase/functions/describir-foto/index.ts`)**:
+  - Protegida con autenticación JWT de Supabase.
+  - Genera descripciones concisas en español (1–2 oraciones) usando `google('gemini-3.8-flash')` y `generateText`.
+  - Registra el consumo en la tabla `uso_ia` y valida el límite diario de peticiones.
+- **Persistencia y sincronización**:
+  - Columna `ai_description` añadida en SQLite (`db/schema.ts`, migración Drizzle `0005_light_lily_hollister.sql`).
+  - Columna `ai_description` en Supabase (`supabase_semana10.sql`).
+  - Sincronización bidireccional (`src/services/sync.ts`): tanto en subida (`push`) como en bajada (`pull`).
+- **UI en detalle de foto (`src/app/foto/[id].tsx`)**:
+  - Botón "✨ Describir con IA" con indicador de carga y deshabilitado si está sin conexión (`useIsOnline`).
+  - Aviso de privacidad explícito (*"La foto se envía a Google Gemini para ser descrita"*).
+  - Campo editable para ajustar la descripción antes de guardar.
+  - Botón de guardado que actualiza `updatedAt` y encola la sincronización automática a Supabase.
+  - Badge visual `✨ [Descripción]` en la tarjeta de la biblioteca (`GeoPhotoCard.tsx`).
+
+#### 2. Asistente IA / Tutor (C1–C6)
+- **C1 – Historial persistente en SQLite**:
+  - Tabla `chat_messages` gestionada con Drizzle (`db/repositories/chatMessages.ts`).
+  - Al abrir la pestaña "Asistente", la conversación previa se restaura instantáneamente desde SQLite.
+  - Botón "🔄 Reiniciar" para limpiar la conversación local.
+- **C2 – Instrucciones personalizadas con Zod**:
+  - Modal de configuración de perfil de estudiante (Nombre, Tema de estudio, Nivel educativo).
+  - El perfil viaja en el cuerpo del transporte (`src/lib/chatTransport.ts`) y es validado en la Edge Function `tutor` mediante un esquema Zod con `.catch({})`.
+- **C3 – Salida estructurada (Flashcards de estudio)**:
+  - Edge Function `tarjetas-repaso` (`supabase/functions/tarjetas-repaso/index.ts`) utiliza `generateText` con `Output.object({ schema })` para generar entre 3 y 5 flashcards pedagógicas (pregunta y respuesta).
+  - Visor interactivo en la app con animación de volteo ("flip card") al tocar cada tarjeta.
+- **C4 – Manejo exhaustivo de estados y errores**:
+  - Banner y bloqueo de envío cuando el dispositivo no tiene conexión a internet.
+  - Manejo de respuestas HTTP 401 (sesión expirada con redirección), 429 (límite de cuota diaria alcanzado) y 500 (errores del modelo o de red).
+  - Botón de reintento en caso de fallo.
+- **C5 – Límite de uso por usuario**:
+  - Tabla `uso_ia` en Supabase con RLS vinculada al `user_id` del usuario autenticado.
+  - Límite configurable de 20 peticiones por ventana de 24 horas. Si se supera, responde 429 con mensaje informativo.
+- **C6 – Bitácora y pruebas**:
+  - `AI-LOG.md`: Bitácora detallada de prompts, decisiones técnicas, roles de archivos y 6 errores reales de IA documentados con causa raíz y solución.
+  - `PRUEBAS.md`: Matriz exhaustiva con 12 escenarios de prueba (E1–E12) que validan el comportamiento offline, cuotas, streaming, persistencia y visión multimodal.
+
+---
+
+### Despliegue en Supabase
+
+1. **Configurar secreto de Gemini en Supabase**:
+   ```bash
+   npx supabase secrets set GEMINI_API_KEY=tu_api_key_de_gemini
+   ```
+
+2. **Ejecutar el script SQL (`supabase_semana10.sql`) en el SQL Editor de Supabase**:
+   - Agrega la columna `ai_description` a la tabla `photos`.
+   - Crea la tabla `uso_ia` con políticas RLS e índices de rendimiento.
+
+3. **Desplegar las Edge Functions**:
+   ```bash
+   npx supabase functions deploy describir-foto --no-verify-jwt
+   npx supabase functions deploy tutor --no-verify-jwt
+   npx supabase functions deploy tarjetas-repaso --no-verify-jwt
+   ```
+
+---
+
 ### Actualización a Expo SDK 58 (Compatibilidad con Expo Go 58)
 
 El proyecto se encuentra actualizado a **Expo SDK 58** (`58.0.26`) con `@expo/cli` (`58.1.21`), `react@19.3.0` y `react-native@0.88.1`. Todas las dependencias nativas (`expo-camera`, `expo-sqlite`, `expo-location`, `expo-router`, `react-native-maps`, etc.) están alineadas para operar con la aplicación móvil **Expo Go 58**.

@@ -45,6 +45,9 @@ export const photos = sqliteTable(
 
     // Semana 9 (C1): Borrado lógico sincronizado
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
+
+    // Semana 10 (T3): Descripción generada con IA
+    aiDescription: text('ai_description'),
   },
   (table) => [index('photos_created_at_idx').on(table.createdAt)]
 );
@@ -55,9 +58,22 @@ export const syncMeta = sqliteTable('sync_meta', {
   value: text('value').notNull(),
 });
 
+// Semana 10 (C1): Persistencia del historial de chat en SQLite
+export const chatMessages = sqliteTable('chat_messages', {
+  id: text('id').primaryKey(),
+  role: text('role', { enum: ['user', 'assistant', 'system'] }).notNull(),
+  content: text('content').notNull(),
+  parts: text('parts'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export type Album = typeof albums.$inferSelect;
 export type NewAlbum = typeof albums.$inferInsert;
 export type Photo = typeof photos.$inferSelect;
 export type NewPhoto = typeof photos.$inferInsert;
 export type SyncMeta = typeof syncMeta.$inferSelect;
 export type NewSyncMeta = typeof syncMeta.$inferInsert;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type NewChatMessage = typeof chatMessages.$inferInsert;
