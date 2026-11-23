@@ -1,7 +1,7 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import React, { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 
@@ -11,7 +11,7 @@ import { Brand, Spacing } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ThemeProvider as AppThemeProvider, useThemeContext } from '@/context/ThemeContext';
 import { asyncStoragePersister, queryClient, useAppFocusManager } from '@/lib/queryClient';
-import { db } from '../../db/client';
+import { db, initWebDatabase } from '../../db/client';
 import { photosRepo } from '../../db/repositories/photos';
 import migrations from '../../drizzle/migrations';
 
@@ -55,7 +55,7 @@ function RootNavigator() {
   );
 }
 
-function MigrationGate() {
+function MigrationGateContent() {
   const { success, error } = useMigrations(db, migrations);
 
   if (error) {
@@ -81,6 +81,48 @@ function MigrationGate() {
       <RootNavigator />
     </AuthProvider>
   );
+}
+
+function MigrationGate() {
+  const [isDbReady, setIsDbReady] = useState(Platform.OS !== 'web');
+  const [initError, setInitError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      let isMounted = true;
+      initWebDatabase()
+        .then(() => {
+          if (isMounted) setIsDbReady(true);
+        })
+        .catch((err) => {
+          console.error('Error inicializando SQLite en Web:', err);
+          if (isMounted) setInitError(err instanceof Error ? err : new Error(String(err)));
+        });
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, []);
+
+  if (initError) {
+    return (
+      <View style={styles.state}>
+        <ThemedText type="cardTitle">No se pudo iniciar la base de datos en Web</ThemedText>
+        <ThemedText themeColor="textSecondary">{initError.message}</ThemedText>
+      </View>
+    );
+  }
+
+  if (!isDbReady) {
+    return (
+      <View style={styles.state}>
+        <ActivityIndicator color={Brand.primary} />
+        <ThemedText themeColor="textSecondary">Iniciando base de datos web…</ThemedText>
+      </View>
+    );
+  }
+
+  return <MigrationGateContent />;
 }
 
 function RootContent() {
